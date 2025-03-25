@@ -7,7 +7,7 @@
 TypeConverter::TypeConverter() {
     // Initialize the type mapping
     typeMap[PascalType::INTEGER] = "int";
-    typeMap[PascalType::REAL] = "float";
+    typeMap[PascalType::REAL] = "double";
     typeMap[PascalType::BOOLEAN] = "int";  // In C, boolean is typically represented as int
     typeMap[PascalType::CHAR] = "char";
     typeMap[PascalType::ARRAY] = "";  // Special case, handled separately

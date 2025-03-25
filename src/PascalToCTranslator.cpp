@@ -675,7 +675,7 @@ std::any PascalToCTranslator::visitReadStatement(PascalSParser::ReadStatementCon
             if (entry.dataType == PascalType::INTEGER) {
                 format = "\"%d\"";
             } else if (entry.dataType == PascalType::REAL) {
-                format = "\"%f\"";
+                format = "\"%lf\"";
             } else if (entry.dataType == PascalType::CHAR) {
                 format = "\" %c\"";
             } else {
@@ -724,7 +724,7 @@ std::any PascalToCTranslator::visitWriteStatement(PascalSParser::WriteStatementC
         // Try to determine the type of the expression
         std::string expr = exprs[i];
         if (expr.find('.') != std::string::npos) {
-            formatStr += "%f";  // Real/float
+            formatStr += "%lf";  // Real/double
         } else if (expr.find('\"') != std::string::npos) {
             formatStr += "%s";  // String
         } else if (expr.find('\'') != std::string::npos) {
@@ -744,7 +744,7 @@ std::any PascalToCTranslator::visitWriteStatement(PascalSParser::WriteStatementC
                             found = true;
                             break;
                         case PascalType::REAL:
-                            formatStr += "%f";
+                            formatStr += "%lf";
                             found = true;
                             break;
                         case PascalType::BOOLEAN:
