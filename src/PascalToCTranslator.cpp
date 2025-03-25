@@ -527,13 +527,13 @@ std::any PascalToCTranslator::visitCompoundStatement(PascalSParser::CompoundStat
 }
 
 std::any PascalToCTranslator::visitStatementList(PascalSParser::StatementListContext *context) {
-    // Visit the first statement
-    visit(context->statement());
-
-    // Visit additional statements if any
+    // Visit additional statements first if any
     if (context->statementList()) {
         visit(context->statementList());
     }
+
+    // Visit the current statement
+    visit(context->statement());
 
     return std::any();
 }
@@ -721,7 +721,49 @@ std::any PascalToCTranslator::visitWriteStatement(PascalSParser::WriteStatementC
     // Format string
     std::string formatStr = "\"";
     for (size_t i = 0; i < exprs.size(); ++i) {
-        formatStr += "%s";
+        // Try to determine the type of the expression
+        std::string expr = exprs[i];
+        if (expr.find('.') != std::string::npos) {
+            formatStr += "%f";  // Real/float
+        } else if (expr.find('\"') != std::string::npos) {
+            formatStr += "%s";  // String
+        } else if (expr.find('\'') != std::string::npos) {
+            formatStr += "%c";  // Character
+        } else if (expr == "0" || expr == "1" || expr == "true" || expr == "false") {
+            formatStr += "%d";  // Boolean
+        } else {
+            // Try to look up the type in the symbol table
+            bool found = false;
+            if (expr.find('(') == std::string::npos && expr.find('[') == std::string::npos) {
+                // Simple identifier
+                if (symbolTable->hasSymbol(expr)) {
+                    const SymbolEntry &entry = symbolTable->getSymbol(expr);
+                    switch (entry.dataType) {
+                        case PascalType::INTEGER:
+                            formatStr += "%d";
+                            found = true;
+                            break;
+                        case PascalType::REAL:
+                            formatStr += "%f";
+                            found = true;
+                            break;
+                        case PascalType::BOOLEAN:
+                            formatStr += "%d";
+                            found = true;
+                            break;
+                        case PascalType::CHAR:
+                            formatStr += "%c";
+                            found = true;
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+            if (!found) {
+                formatStr += "%d";  // Default to integer
+            }
+        }
     }
     formatStr += "\\n\"";
 

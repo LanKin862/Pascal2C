@@ -7,8 +7,8 @@
 #include "../include/TranslatorUtils.h"
 
 void printUsage() {
-    std::cout << "Usage: compiler -i <input_file>" << std::endl;
-    std::cout << "output will be written to <input_file>.c" << std::endl;
+    std::cout << "Usage: compiler <input_file> [output_file]" << std::endl;
+    std::cout << "If output_file is not specified, output will be written to <input_file>.c" << std::endl;
 }
 
 // Function to read file contents into a string
@@ -39,26 +39,33 @@ bool writeToFile(const std::string& filePath, const std::string& content) {
 
 int main(int argc, char* argv[]) {
     // Check command line arguments
-    if (argc < 3 || std::string(argv[1]) != "-i") {
+    if (argc < 2 || argc > 3) {
         printUsage();
         return 1;
     }
 
-    // Get input file path
-    std::string inputFile = argv[2];
+    // Get input and output file paths
+    std::string inputFile = argv[1];
     std::string outputFile;
 
-    // Default output file name is input file name with .c extension
-    size_t dotPos = inputFile.find_last_of('.');
-    if (dotPos != std::string::npos) {
-        outputFile = inputFile.substr(0, dotPos) + ".c";
+    if (argc == 3) {
+        outputFile = argv[2];
     } else {
-        outputFile = inputFile + ".c";
+        // Default output file name is input file name with .c extension
+        size_t dotPos = inputFile.find_last_of('.');
+        if (dotPos != std::string::npos) {
+            outputFile = inputFile.substr(0, dotPos) + ".c";
+        } else {
+            outputFile = inputFile + ".c";
+        }
     }
 
     try {
         // Read and display the contents of the input file
         std::string inputFileContents = readFileContents(inputFile);
+        std::cout << "Input file contents:\n"
+                  << inputFileContents << std::endl;
+        std::cout << "-----------------------------------------" << std::endl;
 
         // Create translator
         PascalToCTranslator translator;
@@ -72,28 +79,33 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
+        // Display the translated code
+        std::cout << "Translated C code:\n"
+                  << cCode << std::endl;
+        std::cout << "-----------------------------------------" << std::endl;
+
         // Write the translated code to the output file
         if (!writeToFile(outputFile, cCode)) {
             std::cerr << "Failed to open or write to output file: " << outputFile << std::endl;
             return 1;
         }
 
-//        // Create additional files with detailed information if needed
-//        std::string debugFile = outputFile + ".debug";
-//        std::stringstream debugInfo;
-//        debugInfo << "Original Pascal-S code:\n";
-//        debugInfo << "=====================\n";
-//        debugInfo << inputFileContents << "\n\n";
-//        debugInfo << "Translated C code:\n";
-//        debugInfo << "=====================\n";
-//        debugInfo << cCode;
+        // Create additional files with detailed information if needed
+        std::string debugFile = outputFile + ".debug";
+        std::stringstream debugInfo;
+        debugInfo << "Original Pascal-S code:\n";
+        debugInfo << "=====================\n";
+        debugInfo << inputFileContents << "\n\n";
+        debugInfo << "Translated C code:\n";
+        debugInfo << "=====================\n";
+        debugInfo << cCode;
 
-//        if (!writeToFile(debugFile, debugInfo.str())) {
-//            std::cout << "Note: Could not create debug information file." << std::endl;
-//        }
+        if (!writeToFile(debugFile, debugInfo.str())) {
+            std::cout << "Note: Could not create debug information file." << std::endl;
+        }
 
         std::cout << "Translation completed successfully. Output written to " << outputFile << std::endl;
-//        std::cout << "Debug information written to " << debugFile << std::endl;
+        std::cout << "Debug information written to " << debugFile << std::endl;
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;
