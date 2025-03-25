@@ -26,9 +26,10 @@ std::string TypeConverter::convertArrayType(PascalType elementType, const std::v
     std::stringstream ss;
     ss << baseType;
 
-    // Add dimensions in C style (e.g. int[10][20])
+    // Add dimensions in C style (e.g., int[10] for array[1..10] of integer)
     for (const auto& dim : dimensions) {
-        ss << "[" << (dim.upperBound - dim.lowerBound + 1) << "]";
+        int size = dim.upperBound - dim.lowerBound + 1;
+        ss << "[" << size << "]";
     }
 
     return ss.str();
