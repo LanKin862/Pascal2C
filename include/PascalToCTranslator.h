@@ -25,6 +25,7 @@ class PascalToCTranslator : public PascalSVisitor {
     void decreaseIndentation();
     std::string getCurrentIndentation() const;
     std::string getNextTempVar();
+    void generateForwardDeclarations(PascalSParser::SubprogramDeclarationsContext *context);
 
   public:
     PascalToCTranslator();

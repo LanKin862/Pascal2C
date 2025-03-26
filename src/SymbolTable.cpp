@@ -10,7 +10,25 @@ bool ScopeEntry::addSymbol(const SymbolEntry& symbol) {
         return false;
     }
     symbols[symbol.name] = symbol;
+    
+    // If this is a parameter, add it to the ordered parameter list
+    if (symbol.symbolType == SymbolType::PARAMETER) {
+        addParameter(symbol);
+    }
+    
     return true;
+}
+
+void ScopeEntry::addParameter(const SymbolEntry& param) {
+    parameters.push_back(param);
+}
+
+const std::vector<SymbolEntry>& ScopeEntry::getParameters() const {
+    return parameters;
+}
+
+std::vector<SymbolEntry>& ScopeEntry::getParameters() {
+    return parameters;
 }
 
 bool ScopeEntry::hasSymbol(const std::string& name) const {
@@ -71,6 +89,24 @@ ScopeEntry& SymbolTable::getCurrentScope() {
 
 const ScopeEntry& SymbolTable::getCurrentScope() const {
     return *scopes[currentScopeIndex];
+}
+
+bool SymbolTable::hasScope(const std::string& scopeName) const {
+    for (const auto& scope : scopes) {
+        if (scope->getScopeName() == scopeName) {
+            return true;
+        }
+    }
+    return false;
+}
+
+const ScopeEntry& SymbolTable::getScope(const std::string& scopeName) const {
+    for (const auto& scope : scopes) {
+        if (scope->getScopeName() == scopeName) {
+            return *scope;
+        }
+    }
+    throw TranslatorException("Scope '" + scopeName + "' not found");
 }
 
 bool SymbolTable::addSymbol(const SymbolEntry& symbol) {

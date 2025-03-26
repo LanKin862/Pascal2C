@@ -122,6 +122,23 @@ std::any PascalToCTranslator::visitProgramBody(PascalSParser::ProgramBodyContext
     if (context->varDeclarations()) {
         visit(context->varDeclarations());
     }
+    
+    // First create forward declarations for all subprograms to facilitate reference parameter detection
+    if (context->subprogramDeclarations()) {
+        // Create a temporary string stream to collect forward declarations
+        std::stringstream forwardDeclsStream;
+        std::stringstream tempOutput = std::move(output);
+        output = std::move(forwardDeclsStream);
+        
+        output << "// Forward declarations\n";
+        generateForwardDeclarations(context->subprogramDeclarations());
+        output << "\n";
+        
+        // Restore the original output and add forward declarations
+        std::string forwardDecls = output.str();
+        output = std::move(tempOutput);
+        output << forwardDecls;
+    }
 
     // Visit subprogram declarations
     if (context->subprogramDeclarations()) {
@@ -144,6 +161,47 @@ std::any PascalToCTranslator::visitProgramBody(PascalSParser::ProgramBodyContext
     output << "}\n";
 
     return std::any();
+}
+
+// Helper method to generate forward declarations
+void PascalToCTranslator::generateForwardDeclarations(PascalSParser::SubprogramDeclarationsContext *context) {
+    if (!context) return;
+    
+    // Process the current subprogram first (earlier in source)
+    if (context->subprogram()) {
+        PascalSParser::SubprogramHeadContext* headContext = context->subprogram()->subprogramHead();
+        if (headContext) {
+            std::string name = TranslatorUtils::toCIdentifier(headContext->ID()->getText());
+            bool isFunction = headContext->FUNCTION() != nullptr;
+            
+            // Get return type for functions
+            std::string returnType = "void";
+            if (isFunction && headContext->basicType()) {
+                auto result = visit(headContext->basicType());
+                PascalType pascalReturnType = std::any_cast<PascalType>(result);
+                returnType = typeConverter->convertType(pascalReturnType);
+            }
+            
+            // Get parameters
+            std::string params = "()";
+            if (headContext->formalParameter()) {
+                auto paramsResult = visit(headContext->formalParameter());
+                params = std::any_cast<std::string>(paramsResult);
+
+                // Clean up array brackets in parameters for forward declarations
+                std::regex pattern("\\[.*?\\]");
+                params = std::regex_replace(params, pattern, "");
+            }
+            
+            // Output forward declaration
+            output << returnType << " " << name << params << ";\n";
+        }
+    }
+    
+    // Then process any nested declarations (later in source)
+    if (context->subprogramDeclarations()) {
+        generateForwardDeclarations(context->subprogramDeclarations());
+    }
 }
 
 std::any PascalToCTranslator::visitIdList(PascalSParser::IdListContext *context) {
@@ -280,9 +338,9 @@ std::any PascalToCTranslator::visitVarDeclaration(PascalSParser::VarDeclarationC
         std::smatch matches;
         if (std::regex_search(typeStr, matches, pattern)) {
             // Array type
-            id = id + std::string(matches[0]);
-            typeStr = std::regex_replace(typeStr, pattern, "");
-            output << typeStr << " " << id;
+            std::string tmpId = id + std::string(matches[0]);
+            std::string tmpTypeStr = std::regex_replace(typeStr, pattern, "");
+            output << tmpTypeStr << " " << tmpId;
         } else {
             // Basic type
             output << typeStr << " " << id;
@@ -386,12 +444,12 @@ std::any PascalToCTranslator::visitSubprogramDeclarations(PascalSParser::Subprog
         return std::any();
     }
 
-    // Process the subprogram
+    // First process the current subprogram, which comes earlier in the source
     if (context->subprogram()) {
         visit(context->subprogram());
     }
 
-    // Process additional subprogram declarations if any
+    // Then process additional subprogram declarations that come later in the source
     if (context->subprogramDeclarations()) {
         visit(context->subprogramDeclarations());
     }
@@ -449,8 +507,12 @@ std::any PascalToCTranslator::visitSubprogramHead(PascalSParser::SubprogramHeadC
     // Visit formal parameters
     auto paramsResult = visit(context->formalParameter());
     std::string params = std::any_cast<std::string>(paramsResult);
+
+    // In C, array parameters in function declarations should not include size specifications
+    // Replace array size brackets with empty brackets
     std::regex pattern("\\[.*?\\]");
     params = std::regex_replace(params, pattern, "");
+    
     output << params;
 
     return std::any();
@@ -470,24 +532,42 @@ std::any PascalToCTranslator::visitFormalParameter(PascalSParser::FormalParamete
 }
 
 std::any PascalToCTranslator::visitParameterList(PascalSParser::ParameterListContext *context) {
-    // Visit first parameter
+    std::string paramList = "";
+    
+    // First process the current parameter
     auto result = visit(context->parameter());
-    std::string params = std::any_cast<std::string>(result);
-
-    // Visit additional parameters if any
+    std::string param = std::any_cast<std::string>(result);
+    
+    TranslatorUtils::logDebug("Processing parameter: " + param);
+    
+    // Check if there are any nested parameters (which come earlier in the Pascal code)
     if (context->parameterList()) {
-        auto moreParams = visit(context->parameterList());
-        std::string moreParamsStr = std::any_cast<std::string>(moreParams);
-        params = moreParamsStr + ", " + params;
+        auto moreParamsResult = visit(context->parameterList());
+        std::string moreParamsStr = std::any_cast<std::string>(moreParamsResult);
+        
+        TranslatorUtils::logDebug("Earlier parameters: " + moreParamsStr);
+        
+        // Put the earlier parameters first in the list
+        if (!moreParamsStr.empty()) {
+            paramList = moreParamsStr + ", " + param;
+            TranslatorUtils::logDebug("Combined parameters: " + paramList);
+        } else {
+            paramList = param;
+        }
+    } else {
+        // No nested parameters, just return the current one
+        paramList = param;
     }
-
-    return params;
+    
+    return paramList;
 }
 
 std::any PascalToCTranslator::visitParameter(PascalSParser::ParameterContext *context) {
     if (context->varParameter()) {
+        TranslatorUtils::logDebug("Processing VAR parameter");
         return visit(context->varParameter());
     } else if (context->valueParameter()) {
+        TranslatorUtils::logDebug("Processing value parameter");
         return visit(context->valueParameter());
     }
 
@@ -503,11 +583,34 @@ std::any PascalToCTranslator::visitVarParameter(PascalSParser::VarParameterConte
     auto idListResult = visit(context->valueParameter()->idList());
     std::vector<std::string> ids = std::any_cast<std::vector<std::string>>(idListResult);
     
+    // Debug output
+    std::string idListStr;
+    for (const auto& id : ids) {
+        if (!idListStr.empty()) idListStr += ", ";
+        idListStr += id;
+    }
+    TranslatorUtils::logDebug("VAR parameter identifiers: " + idListStr);
+    
     // Mark all parameters as reference parameters in symbol table
     for (const auto& id : ids) {
         if (symbolTable->hasSymbolInCurrentScope(id)) {
+            // Update the symbol in the symbol table
             SymbolEntry& entry = symbolTable->getSymbol(id);
             entry.isReference = true;
+            
+            // Check if the parameter is an array
+            bool isArray = (entry.dataType == PascalType::ARRAY);
+            TranslatorUtils::logDebug("  Marking " + id + " as reference parameter, isArray: " + (isArray ? "true" : "false"));
+            
+            // Since we already have addSymbol automatically adding parameters,
+            // we need to update the existing parameters in the scope's parameters list
+            std::vector<SymbolEntry>& parameters = symbolTable->getCurrentScope().getParameters();
+            for (auto& param : parameters) {
+                if (param.name == id) {
+                    param.isReference = true;
+                    break;
+                }
+            }
         }
     }
 
@@ -523,6 +626,14 @@ std::any PascalToCTranslator::visitVarParameter(PascalSParser::VarParameterConte
 std::any PascalToCTranslator::visitValueParameter(PascalSParser::ValueParameterContext *context) {
     // Get identifiers
     std::vector<std::string> ids = std::any_cast<std::vector<std::string>>(visit(context->idList()));
+
+    // Debug output
+    std::string idListStr;
+    for (const auto& id : ids) {
+        if (!idListStr.empty()) idListStr += ", ";
+        idListStr += id;
+    }
+    TranslatorUtils::logDebug("Value parameter identifiers: " + idListStr);
 
     // Get type
     auto typeResult = visit(context->type());
@@ -560,18 +671,29 @@ std::any PascalToCTranslator::visitValueParameter(PascalSParser::ValueParameterC
         }
 
         ss << typeStr << " " << ids[i];
+        TranslatorUtils::logDebug("  Adding parameter: " + typeStr + " " + ids[i] + 
+                                 ", type: " + (pascalType == PascalType::ARRAY ? "ARRAY" : 
+                                             (pascalType == PascalType::INTEGER ? "INTEGER" : 
+                                             (pascalType == PascalType::REAL ? "REAL" : 
+                                             (pascalType == PascalType::BOOLEAN ? "BOOLEAN" : 
+                                             (pascalType == PascalType::CHAR ? "CHAR" : "UNKNOWN"))))));
 
         // Add to symbol table
         SymbolEntry entry;
         entry.name = ids[i];
         entry.symbolType = SymbolType::PARAMETER;
         entry.dataType = pascalType;
-        entry.isReference = false;
+        entry.isReference = false;  // Default is by value, will be updated if VAR parameter
 
         // Store array-specific information if needed
         if (pascalType == PascalType::ARRAY) {
             entry.arrayElementType = elementType;
             entry.arrayDimensions = dimensions;
+            TranslatorUtils::logDebug(
+                                     (elementType == PascalType::INTEGER ? "INTEGER" :
+                                     (elementType == PascalType::REAL ? "REAL" : 
+                                     (elementType == PascalType::BOOLEAN ? "BOOLEAN" : 
+                                     (elementType == PascalType::CHAR ? "CHAR" : "UNKNOWN")))));
         }
 
         symbolTable->addSymbol(entry);
@@ -810,7 +932,14 @@ std::any PascalToCTranslator::visitReadStatement(PascalSParser::ReadStatementCon
                     }
                 }
 
-                output << getCurrentIndentation() << "scanf(" << format << ", &" << var << ");\n";
+                // For reference parameters (not local variables) that are not arrays, in the current scope, we don't need to use &
+                if (entry.isReference && entry.symbolType == SymbolType::PARAMETER && 
+                    !isArrayAccess && entry.dataType != PascalType::ARRAY && 
+                    symbolTable->hasSymbolInCurrentScope(baseVar)) {
+                    output << getCurrentIndentation() << "scanf(" << format << ", " << var << ");\n";
+                } else {
+                    output << getCurrentIndentation() << "scanf(" << format << ", &" << var << ");\n";
+                }
             } else {
                 // Default to integer if type is unknown
                 output << getCurrentIndentation() << "scanf(\"%d\", &" << var << ");\n";
@@ -849,18 +978,23 @@ std::any PascalToCTranslator::visitWriteStatement(PascalSParser::WriteStatementC
 
     // Format string
     std::string formatStr = "\"";
+    std::vector<std::string> formattedArgs;
+    
+    // Process expressions in the original Pascal order (already handled in visitExpressionList)
     for (size_t i = 0; i < exprs.size(); ++i) {
         std::string expr = exprs[i];
+        std::string formatSpecifier;
+        std::string formattedArg = expr;
         
         // Check if it's a string literal
         if (expr.size() >= 2 && expr[0] == '\'' && expr.back() == '\'') {
-            formatStr += "%s";
+            formatSpecifier = "%s";
             // Remove the single quotes from the expression
-            exprs[i] = "\"" + expr.substr(1, expr.size() - 2) + "\"";
+            formattedArg = "\"" + expr.substr(1, expr.size() - 2) + "\"";
         } else if (expr.find('.') != std::string::npos) {
-            formatStr += "%f";
+            formatSpecifier = "%f";
         } else if (expr == "0" || expr == "1" || expr == "true" || expr == "false") {
-            formatStr += "%d";
+            formatSpecifier = "%d";
         } else {
             // Try to look up the type in the symbol table
             bool found = false;
@@ -885,34 +1019,37 @@ std::any PascalToCTranslator::visitWriteStatement(PascalSParser::WriteStatementC
                 if (entry.dataType == PascalType::ARRAY && bracketPos != std::string::npos) {
                     // Use the array element type for array accesses
                     switch (entry.arrayElementType) {
-                        case PascalType::INTEGER: formatStr += "%d"; found = true; break;
-                        case PascalType::REAL: formatStr += "%f"; found = true; break;
-                        case PascalType::BOOLEAN: formatStr += "%d"; found = true; break;
-                        case PascalType::CHAR: formatStr += "%c"; found = true; break;
+                        case PascalType::INTEGER: formatSpecifier = "%d"; found = true; break;
+                        case PascalType::REAL: formatSpecifier = "%f"; found = true; break;
+                        case PascalType::BOOLEAN: formatSpecifier = "%d"; found = true; break;
+                        case PascalType::CHAR: formatSpecifier = "%c"; found = true; break;
                         default: break;
                     }
                 } else {
                     // Use the variable's own type
                     switch (entry.dataType) {
-                        case PascalType::INTEGER: formatStr += "%d"; found = true; break;
-                        case PascalType::REAL: formatStr += "%f"; found = true; break;
-                        case PascalType::BOOLEAN: formatStr += "%d"; found = true; break;
-                        case PascalType::CHAR: formatStr += "%c"; found = true; break;
+                        case PascalType::INTEGER: formatSpecifier = "%d"; found = true; break;
+                        case PascalType::REAL: formatSpecifier = "%f"; found = true; break;
+                        case PascalType::BOOLEAN: formatSpecifier = "%d"; found = true; break;
+                        case PascalType::CHAR: formatSpecifier = "%c"; found = true; break;
                         default: break;
                     }
                 }
             }
             
-            if (!found) formatStr += "%d";  // Default to integer format
+            if (!found) formatSpecifier = "%d";  // Default to integer format
         }
+        
+        formatStr += formatSpecifier;
+        formattedArgs.push_back(formattedArg);
     }
+    
     formatStr += "\"";
-
     output << formatStr;
 
-    // Arguments
-    for (const auto &expr : exprs) {
-        output << ", " << expr;
+    // Arguments - keep them in the same order as they appear in the format string
+    for (const auto &arg : formattedArgs) {
+        output << ", " << arg;
     }
 
     output << ");\n";
@@ -920,11 +1057,20 @@ std::any PascalToCTranslator::visitWriteStatement(PascalSParser::WriteStatementC
     return std::any();
 }
 
-
 std::any PascalToCTranslator::visitVariableList(PascalSParser::VariableListContext *context) {
     std::vector<std::string> vars;
 
-    // Get first variable
+    // In Pascal, variables in a list appear from left to right in the source code,
+    // but the ANTLR parser processes them in a way that the rightmost variable becomes
+    // the current node and earlier variables are in the nested variableList.
+    
+    // First, process any earlier variables in the nested variableList
+    if (context->variableList()) {
+        auto earlierVars = visit(context->variableList());
+        vars = std::any_cast<std::vector<std::string>>(earlierVars);
+    }
+    
+    // Then add the current variable, which comes later in the source
     auto result = visit(context->variable());
     
     // Handle potential function return value marker
@@ -934,14 +1080,6 @@ std::any PascalToCTranslator::visitVariableList(PascalSParser::VariableListConte
     } else {
         // Regular variable
         vars.push_back(std::any_cast<std::string>(result));
-    }
-
-    // Get additional variables if any
-    if (context->variableList()) {
-        auto moreVars = visit(context->variableList());
-        std::vector<std::string> moreVarsVec = std::any_cast<std::vector<std::string>>(moreVars);
-
-        vars.insert(vars.end(), moreVarsVec.begin(), moreVarsVec.end());
     }
 
     return vars;
@@ -961,15 +1099,41 @@ std::any PascalToCTranslator::visitVariable(PascalSParser::VariableContext *cont
         return resultPair;
     }
     
+    // Check if the variable is a reference parameter (not a local variable)
+    bool isReferenceParam = false;
+    bool isArray = false;
+    
+    if (symbolTable->hasSymbol(id)) {
+        const SymbolEntry &entry = symbolTable->getSymbol(id);
+        // Only consider as reference parameter if it's actually a parameter and marked as reference
+        isReferenceParam = entry.isReference && entry.symbolType == SymbolType::PARAMETER;
+        isArray = (entry.dataType == PascalType::ARRAY);
+    }
+    
     // Check if it's an array access
+    std::string result;
     if (context->idVarPart()) {
-        auto result = visit(context->idVarPart());
-        std::string indices = std::any_cast<std::string>(result);
-
-        return std::string(id + indices);
+        auto partResult = visit(context->idVarPart());
+        std::string indices = std::any_cast<std::string>(partResult);
+        
+        // Only dereference reference parameters (not local variables) when they're used within the function they were passed to
+        if (isReferenceParam && !isArray && symbolTable->hasSymbolInCurrentScope(id)) {
+            // For non-array reference parameters, we need to dereference when accessing
+            result = "(*" + id + ")" + indices;
+        } else {
+            result = id + indices;
+        }
+    } else {
+        // Not an array access
+        if (isReferenceParam && !isArray && symbolTable->hasSymbolInCurrentScope(id)) {
+            // For non-array reference parameters, we need to dereference
+            result = "*" + id;
+        } else {
+            result = id;
+        }
     }
 
-    return std::string(id);
+    return result;
 }
 
 std::any PascalToCTranslator::visitIdVarPart(PascalSParser::IdVarPartContext *context) {
@@ -1003,11 +1167,82 @@ std::any PascalToCTranslator::visitProcedureCall(PascalSParser::ProcedureCallCon
         std::stringstream ss;
         ss << id << "(";
 
+        // Get procedure definition if available to check for reference parameters
+        bool hasProcedureSymbol = symbolTable->hasSymbol(id);
+        std::vector<SymbolEntry> parameters;
+        
+        if (hasProcedureSymbol) {
+            // Get the parameters for this procedure
+            if (symbolTable->hasScope(id)) {
+                const ScopeEntry& scope = symbolTable->getScope(id);
+                parameters = scope.getParameters();
+                
+                // Debug output to verify parameters
+                TranslatorUtils::logDebug("Procedure " + id + " parameters:");
+                for (size_t i = 0; i < parameters.size(); ++i) {
+                    TranslatorUtils::logDebug("  Param " + std::to_string(i) + ": " + parameters[i].name + 
+                                             ", isRef: " + (parameters[i].isReference ? "true" : "false"));
+                }
+            }
+        }
+
         for (size_t i = 0; i < args.size(); ++i) {
             if (i > 0) {
                 ss << ", ";
             }
-            ss << args[i];
+
+            // Check if this parameter should be passed by reference
+            bool isReferenceParam = false;
+            bool isArrayType = false;
+            
+            // Fix parameter ordering issue: The parameters in the scope's parameters list are 
+            // stored in reverse order compared to how they appear in Pascal source.
+            // We need to reverse the index to match the correct parameter.
+            if (parameters.size() == args.size()) {
+                // Calculate the correct parameter index (parameters are in reverse order)
+                size_t paramIndex = parameters.size() - 1 - i;
+                
+                isReferenceParam = parameters[paramIndex].isReference;
+                
+                // Debug output to verify reference parameter detection
+                TranslatorUtils::logDebug("  Checking arg " + std::to_string(i) + ": " + args[i] + 
+                                         ", isRef: " + (isReferenceParam ? "true" : "false") +
+                                         ", paramIndex: " + std::to_string(paramIndex));
+                
+                // Check if the argument is an array
+                std::string argBase = args[i];
+                size_t bracketPos = argBase.find('[');
+                size_t parenPos = argBase.find('(');
+                
+                // Extract base variable name if it has array indexing or function call
+                if (bracketPos != std::string::npos) {
+                    argBase = argBase.substr(0, bracketPos);
+                } else if (parenPos != std::string::npos) {
+                    argBase = argBase.substr(0, parenPos);
+                }
+                
+                // Check if the argument is an array
+                if (symbolTable->hasSymbol(argBase)) {
+                    const SymbolEntry& argEntry = symbolTable->getSymbol(argBase);
+                    isArrayType = (argEntry.dataType == PascalType::ARRAY);
+                    TranslatorUtils::logDebug("    Arg " + argBase + " is array: " + (isArrayType ? "true" : "false"));
+                }
+                
+                // Add '&' for reference parameters that are not arrays and don't have array indexing or function call
+                // Also don't add '&' if the expression already starts with a '*' (it's already a reference parameter being dereferenced)
+                if (isReferenceParam && !isArrayType && 
+                    args[i].find('[') == std::string::npos && 
+                    args[i].find('(') == std::string::npos && 
+                    !args[i].empty() && args[i][0] != '*') {
+                    ss << "&" << args[i];
+                    TranslatorUtils::logDebug("  Adding & to " + args[i]);
+                } else {
+                    ss << args[i];
+                    if (isReferenceParam && isArrayType) {
+                        TranslatorUtils::logDebug("  NOT adding & to array " + args[i]);
+                    }
+                }
+            }
         }
 
         ss << ")";
@@ -1035,17 +1270,19 @@ std::any PascalToCTranslator::visitExpressionList(PascalSParser::ExpressionListC
     std::vector<std::string> exprs;
 
     try {
-        // Get first expression
+        // In Pascal, expressions in a list appear from left to right in the source code,
+        // but the ANTLR parser processes them in a way that the rightmost expression becomes
+        // the current node and earlier expressions are in the nested expressionList.
+        
+        // First, process any earlier expressions in the nested expressionList
+        if (context->expressionList()) {
+            auto earlierExprs = visit(context->expressionList());
+            exprs = std::any_cast<std::vector<std::string>>(earlierExprs);
+        }
+        
+        // Then add the current expression, which comes later in the source
         auto result = visit(context->expression());
         exprs.push_back(std::any_cast<std::string>(result));
-
-        // Get additional expressions if any
-        if (context->expressionList()) {
-            auto moreExprs = visit(context->expressionList());
-            std::vector<std::string> moreExprsVec = std::any_cast<std::vector<std::string>>(moreExprs);
-
-            exprs.insert(exprs.end(), moreExprsVec.begin(), moreExprsVec.end());
-        }
     } catch (const std::bad_any_cast& e) {
         TranslatorUtils::logError("Type conversion error in expression list: " + std::string(e.what()));
     }
@@ -1137,11 +1374,82 @@ std::any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *context)
         std::stringstream ss;
         ss << id << "(";
 
+        // Get function definition if available to check for reference parameters
+        bool hasFunctionSymbol = symbolTable->hasSymbol(id);
+        std::vector<SymbolEntry> parameters;
+        
+        if (hasFunctionSymbol) {
+            // Get the parameters for this function
+            if (symbolTable->hasScope(id)) {
+                const ScopeEntry& scope = symbolTable->getScope(id);
+                parameters = scope.getParameters();
+                
+                // Debug output to verify parameters
+                TranslatorUtils::logDebug("Function " + id + " parameters:");
+                for (size_t i = 0; i < parameters.size(); ++i) {
+                    TranslatorUtils::logDebug("  Param " + std::to_string(i) + ": " + parameters[i].name + 
+                                             ", isRef: " + (parameters[i].isReference ? "true" : "false"));
+                }
+            }
+        }
+
         for (size_t i = 0; i < args.size(); ++i) {
             if (i > 0) {
                 ss << ", ";
             }
-            ss << args[i];
+
+            // Check if this parameter should be passed by reference
+            bool isReferenceParam = false;
+            bool isArrayType = false;
+            
+            // Fix parameter ordering issue: The parameters in the scope's parameters list are 
+            // stored in reverse order compared to how they appear in Pascal source.
+            // We need to reverse the index to match the correct parameter.
+            if (parameters.size() == args.size()) {
+                // Calculate the correct parameter index (parameters are in reverse order)
+                size_t paramIndex = parameters.size() - 1 - i;
+                
+                isReferenceParam = parameters[paramIndex].isReference;
+                
+                // Debug output to verify reference parameter detection
+                TranslatorUtils::logDebug("  Checking arg " + std::to_string(i) + ": " + args[i] + 
+                                         ", isRef: " + (isReferenceParam ? "true" : "false") +
+                                         ", paramIndex: " + std::to_string(paramIndex));
+                
+                // Check if the argument is an array
+                std::string argBase = args[i];
+                size_t bracketPos = argBase.find('[');
+                size_t parenPos = argBase.find('(');
+                
+                // Extract base variable name if it has array indexing or function call
+                if (bracketPos != std::string::npos) {
+                    argBase = argBase.substr(0, bracketPos);
+                } else if (parenPos != std::string::npos) {
+                    argBase = argBase.substr(0, parenPos);
+                }
+                
+                // Check if the argument is an array
+                if (symbolTable->hasSymbol(argBase)) {
+                    const SymbolEntry& argEntry = symbolTable->getSymbol(argBase);
+                    isArrayType = (argEntry.dataType == PascalType::ARRAY);
+                    TranslatorUtils::logDebug("    Arg " + argBase + " is array: " + (isArrayType ? "true" : "false"));
+                }
+                
+                // Add '&' for reference parameters that are not arrays and don't have array indexing or function call
+                // Also don't add '&' if the expression already starts with a '*' (it's already a reference parameter being dereferenced)
+                if (isReferenceParam && !isArrayType && 
+                    args[i].find('[') == std::string::npos && 
+                    args[i].find('(') == std::string::npos && 
+                    !args[i].empty() && args[i][0] != '*') {
+                    ss << "&" << args[i];
+                    TranslatorUtils::logDebug("  Adding & to " + args[i]);
+                } else {
+                    ss << args[i];
+                    if (isReferenceParam && isArrayType) {
+                        TranslatorUtils::logDebug("  NOT adding & to array " + args[i]);
+                    }
+                }
+            }
         }
 
         ss << ")";

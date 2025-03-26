@@ -16,6 +16,10 @@ void TranslatorUtils::logInfo(const std::string& message) {
     std::cout << "INFO: " << message << std::endl;
 }
 
+void TranslatorUtils::logDebug(const std::string& message) {
+    std::cout << "DEBUG: " << message << std::endl;
+}
+
 std::string TranslatorUtils::toCIdentifier(const std::string& pascalIdentifier) {
     // Convert Pascal identifiers to C identifiers
     // In Pascal, identifiers are case-insensitive, in C they are case-sensitive

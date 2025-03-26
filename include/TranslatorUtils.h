@@ -17,6 +17,7 @@ class TranslatorUtils {
     static void logError(const std::string& message);
     static void logWarning(const std::string& message);
     static void logInfo(const std::string& message);
+    static void logDebug(const std::string& message);
 
     // String manipulation functions
     static std::string toCIdentifier(const std::string& pascalIdentifier);

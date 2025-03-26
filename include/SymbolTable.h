@@ -45,6 +45,7 @@ class ScopeEntry {
   private:
     std::map<std::string, SymbolEntry> symbols;
     std::string scopeName;
+    std::vector<SymbolEntry> parameters;  // To store parameters in order of declaration
 
   public:
     ScopeEntry(const std::string& name);
@@ -55,6 +56,12 @@ class ScopeEntry {
     std::map<std::string, SymbolEntry>& getSymbols();
     const std::map<std::string, SymbolEntry>& getSymbols() const;
     std::string getScopeName() const;
+    // Add parameter to ordered list (for procedures and functions)
+    void addParameter(const SymbolEntry& param);
+    // Get parameters in order
+    const std::vector<SymbolEntry>& getParameters() const;
+    // Get mutable reference to parameters vector for modification
+    std::vector<SymbolEntry>& getParameters();
 };
 
 // Symbol table class to manage symbols and scopes
@@ -72,6 +79,8 @@ class SymbolTable {
     bool isInGlobalScope() const;
     ScopeEntry& getCurrentScope();
     const ScopeEntry& getCurrentScope() const;
+    bool hasScope(const std::string& scopeName) const;
+    const ScopeEntry& getScope(const std::string& scopeName) const;
 
     // Symbol management
     bool addSymbol(const SymbolEntry& symbol);
