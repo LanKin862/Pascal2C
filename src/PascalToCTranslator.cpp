@@ -3,6 +3,7 @@
 #include <antlr4-runtime.h>
 
 #include <fstream>
+#include <regex>
 
 #include "../antlr/PascalSLexer.h"
 #include "../antlr/PascalSParser.h"
@@ -273,10 +274,19 @@ std::any PascalToCTranslator::visitVarDeclaration(PascalSParser::VarDeclarationC
     }
 
     // Output variable declarations
-    for (const auto &id : ids) {
+    for (auto &id : ids) {
         // Output the variable declaration with its type
-        output << typeStr << " " << id;
-        
+        std::regex pattern("\\[.*?\\]");
+        std::smatch matches;
+        if (std::regex_search(typeStr, matches, pattern)) {
+            // Array type
+            id = id + std::string(matches[0]);
+            typeStr = std::regex_replace(typeStr, pattern, "");
+            output << typeStr << " " << id;
+        } else {
+            // Basic type
+            output << typeStr << " " << id;
+        }
         // Only add initialization for non-array types
         if (pascalType != PascalType::ARRAY) {
             // Initialize with default values based on type
@@ -316,7 +326,7 @@ std::any PascalToCTranslator::visitVarDeclaration(PascalSParser::VarDeclarationC
 }
 
 std::any PascalToCTranslator::visitType(PascalSParser::TypeContext *context) {
-    if (context->basicType()) {
+    if (context->basicType() && context->ARRAY() == nullptr) {
         auto result = visit(context->basicType());
         PascalType type = std::any_cast<PascalType>(result);
         std::string typeStr = typeConverter->convertType(type);
@@ -439,6 +449,8 @@ std::any PascalToCTranslator::visitSubprogramHead(PascalSParser::SubprogramHeadC
     // Visit formal parameters
     auto paramsResult = visit(context->formalParameter());
     std::string params = std::any_cast<std::string>(paramsResult);
+    std::regex pattern("\\[.*?\\]");
+    params = std::regex_replace(params, pattern, "");
     output << params;
 
     return std::any();
