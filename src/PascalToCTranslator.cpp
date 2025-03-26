@@ -238,8 +238,8 @@ void PascalToCTranslator::generateForwardDeclarations(PascalSParser::SubprogramD
                 params = std::any_cast<std::string>(paramsResult);
 
                 // Clean up array brackets in parameters for forward declarations
-                std::regex pattern("\\[.*?\\]");
-                params = std::regex_replace(params, pattern, "");
+//                std::regex pattern(R"((\[)\d+(\]))");
+//                params = std::regex_replace(params, pattern, "$1$2");
             }
             
             // Output forward declaration
@@ -413,6 +413,17 @@ std::any PascalToCTranslator::visitVarDeclaration(PascalSParser::VarDeclarationC
             pascalType = std::get<1>(arrayTypeInfo);
             elementType = std::get<2>(arrayTypeInfo);
             dimensions = std::get<3>(arrayTypeInfo);
+
+            // Because Pascal arrays are 1-indexed, we need to adjust the bounds to be 0-indexed
+            for (int i = 0; i < typeStr.size(); i++) {
+                if (typeStr[i] >= '0' && typeStr[i] <= '9') {
+                    int tmp = typeStr[i] - '0' + 1;
+                    typeStr[i] = '0' + tmp;
+                }
+            }
+            for (auto &bounds : dimensions) {
+                bounds.lowerBound--;
+            }
         } catch (const std::bad_any_cast& e) {
             throw TranslatorException("Failed to extract type information: " + std::string(e.what()));
         }
@@ -421,13 +432,18 @@ std::any PascalToCTranslator::visitVarDeclaration(PascalSParser::VarDeclarationC
     // Output variable declarations for each identifier
     for (auto &id : ids) {
         // Handle array types with array dimensions in the type string
-        std::regex pattern("\\[.*?\\]");
+        std::regex pattern("\\[.*\\]");
         std::smatch matches;
         if (std::regex_search(typeStr, matches, pattern)) {
             // For array types, put the dimensions after the identifier
             std::string tmpId = id + std::string(matches[0]);
             std::string tmpTypeStr = std::regex_replace(typeStr, pattern, "");
             output << tmpTypeStr << " " << tmpId;
+            
+            // For multidimensional arrays, add initialization code to zero out all elements
+            if (pascalType == PascalType::ARRAY && dimensions.size() > 1) {
+                output << " = {0}";  // C99 and later support this syntax for zero initialization
+            }
         } else {
             // For basic types, standard format
             output << typeStr << " " << id;
@@ -445,6 +461,9 @@ std::any PascalToCTranslator::visitVarDeclaration(PascalSParser::VarDeclarationC
             } else if (pascalType == PascalType::CHAR) {
                 output << " = '\\0'";
             }
+        } else if (dimensions.size() == 1) {
+            // For single dimension arrays, add simple zero initialization
+            output << " = {0}";  // C99 and later support this syntax for zero initialization
         }
         output << ";\n";
 
@@ -528,17 +547,30 @@ std::any PascalToCTranslator::visitBasicType(PascalSParser::BasicTypeContext *co
  */
 std::any PascalToCTranslator::visitPeriod(PascalSParser::PeriodContext *context) {
     std::vector<ArrayBounds> dimensions;
+    std::vector<std::string> numStrings;
+    std::string periodStr = context->getText();
+    std::vector<int> pos;
+    int position = 0;
+    std::regex pattern(R"((\d+)\.\.(\d+))");  // 匹配 "数字..数字"
+    std::smatch matches;
 
+    auto begin = periodStr.cbegin();
+    auto end = periodStr.cend();
+
+    while (std::regex_search(begin, end, matches, pattern)) {
+        numStrings.push_back(matches[1].str());  // 下界（如 "1"）
+        numStrings.push_back(matches[2].str());  // 上界（如 "4"）
+        begin = matches[0].second;           // 继续匹配剩余部分
+    }
     // Parse pairs of numbers separated by DOTDOT (..)
-    for (int i = 0; i < context->NUM().size(); i += 2) {
-        if (i + 1 < context->NUM().size()) {
+    for (int i = 0; i < numStrings.size(); i+=2) {
+        if (i + 1 < numStrings.size()) {
             ArrayBounds bounds;
-            bounds.lowerBound = std::stoi(context->NUM(i)->getText());
-            bounds.upperBound = std::stoi(context->NUM(i + 1)->getText());
+            bounds.lowerBound = std::stoi(numStrings[i]);
+            bounds.upperBound = std::stoi(numStrings[i+1]);
             dimensions.push_back(bounds);
         }
     }
-
     return dimensions;
 }
 
@@ -628,12 +660,35 @@ std::any PascalToCTranslator::visitSubprogramHead(PascalSParser::SubprogramHeadC
     auto paramsResult = visit(context->formalParameter());
     std::string params = std::any_cast<std::string>(paramsResult);
 
-    // In C, array parameters in function declarations should not include size specifications
-    // Replace array size brackets with empty brackets for C compatibility
-    std::regex pattern("\\[.*?\\]");
-    params = std::regex_replace(params, pattern, "");
+    // In C, array parameters need proper pointer notation
+    // For array dimensions, first dimension is always empty in function parameters
+    std::regex arrayPattern("\\[(\\d+)\\]");
+    std::regex multiDimPattern("\\[(\\d+)\\](\\[\\d+\\])+");
+
+    // First find all multidimensional arrays and convert them properly
+    std::smatch matches;
+    std::string processedParams = params;
+    std::string temp = processedParams;
     
-    output << params;
+    while (std::regex_search(temp, matches, multiDimPattern)) {
+        std::string fullMatch = matches[0];
+        
+        // Extract the position and replace with proper C array notation
+        // In C function parameters, first dimension is always empty: int[][10]
+        size_t pos = processedParams.find(fullMatch);
+        if (pos != std::string::npos) {
+            std::string replacement = "[]" + fullMatch.substr(fullMatch.find("]") + 1);
+            processedParams.replace(pos, fullMatch.length(), replacement);
+        }
+        
+        // Continue search from after the current match
+        temp = matches.suffix().str();
+    }
+    
+    // Then handle single dimension arrays
+//    processedParams = std::regex_replace(processedParams, arrayPattern, "[]");
+    
+    output << processedParams;
 
     return std::any();
 }
@@ -679,7 +734,8 @@ std::any PascalToCTranslator::visitParameterList(PascalSParser::ParameterListCon
         
         // Put the earlier parameters first in the list
         if (!moreParamsStr.empty()) {
-            paramList = moreParamsStr + ", " + param;
+            if (param.empty()) paramList = moreParamsStr;
+            else paramList = moreParamsStr + ", " + param;
             TranslatorUtils::logDebug("Combined parameters: " + paramList);
         } else {
             paramList = param;
@@ -733,6 +789,39 @@ std::any PascalToCTranslator::visitVarParameter(PascalSParser::VarParameterConte
     }
     TranslatorUtils::logDebug("VAR parameter identifiers: " + idListStr);
     
+    // Also get type information to check for array types
+    auto typeResult = visit(context->valueParameter()->type());
+    
+    // Initialize variables for type information
+    std::string typeStr;
+    PascalType pascalType;
+    PascalType elementType = PascalType::INTEGER; // Default for arrays
+    std::vector<ArrayBounds> dimensions;
+    bool isArray = false;
+    bool isMultidimensionalArray = false;
+    
+    // Extract type information based on whether it's an array or basic type
+    try {
+        // Try to extract as a basic type first
+        auto typePair = std::any_cast<std::pair<std::string, PascalType>>(typeResult);
+        typeStr = typePair.first;
+        pascalType = typePair.second;
+        isArray = (pascalType == PascalType::ARRAY);
+    } catch (const std::bad_any_cast&) {
+        // If it fails, it's an array type
+        try {
+            auto arrayTypeInfo = std::any_cast<std::tuple<std::string, PascalType, PascalType, std::vector<ArrayBounds>>>(typeResult);
+            typeStr = std::get<0>(arrayTypeInfo);
+            pascalType = std::get<1>(arrayTypeInfo);
+            elementType = std::get<2>(arrayTypeInfo);
+            dimensions = std::get<3>(arrayTypeInfo);
+            isArray = true;
+            isMultidimensionalArray = (dimensions.size() > 1);
+        } catch (const std::bad_any_cast& e) {
+            throw TranslatorException("Failed to extract type information: " + std::string(e.what()));
+        }
+    }
+    
     // Mark all parameters as reference parameters in symbol table
     for (const auto& id : ids) {
         if (symbolTable->hasSymbolInCurrentScope(id)) {
@@ -742,7 +831,10 @@ std::any PascalToCTranslator::visitVarParameter(PascalSParser::VarParameterConte
             
             // Check if the parameter is an array
             bool isArray = (entry.dataType == PascalType::ARRAY);
-            TranslatorUtils::logDebug("  Marking " + id + " as reference parameter, isArray: " + (isArray ? "true" : "false"));
+            bool isMultidim = (isArray && entry.arrayDimensions.size() > 1);
+            TranslatorUtils::logDebug("  Marking " + id + " as reference parameter, isArray: " + 
+                                     (isArray ? "true" : "false") + 
+                                     ", isMultidimensional: " + (isMultidim ? "true" : "false"));
             
             // Since we already have addSymbol automatically adding parameters,
             // we need to update the existing parameters in the scope's parameters list
@@ -759,12 +851,11 @@ std::any PascalToCTranslator::visitVarParameter(PascalSParser::VarParameterConte
     // Add pointer (*) for reference parameters to the type part of the declaration
     // We need to handle multiple parameters in the chain
     std::stringstream ss;
-    std::string typeStr;
+    std::string baseTypeStr;
     size_t pos = params.find_first_of(" ");
     if (pos != std::string::npos) {
-        typeStr = params.substr(0, pos);
+        baseTypeStr = params.substr(0, pos);
         std::string rest = params.substr(pos);
-        std::cout << "rest: " << rest << std::endl;
         
         // Split the rest into individual parameter declarations
         std::vector<std::string> paramDecls;
@@ -772,19 +863,60 @@ std::any PascalToCTranslator::visitVarParameter(PascalSParser::VarParameterConte
         size_t commaPos;
         while ((commaPos = rest.find(",", start)) != std::string::npos) {
             paramDecls.push_back(rest.substr(start, commaPos - start));
-            start = commaPos + 1; // Skip ","
+            start = commaPos + 2; // Skip ", "
         }
         paramDecls.push_back(rest.substr(start));
+        
+        // Extract the base type without array dimensions
+        std::string baseType = baseTypeStr;
+        size_t bracketPos = baseType.find('[');
+        if (bracketPos != std::string::npos) {
+            baseType = baseType.substr(0, bracketPos);
+        }
+        
+        // Check if we're dealing with a multidimensional array
+        std::vector<std::string> dimensionSizes;
+        if (isMultidimensionalArray) {
+            // Extract all dimension sizes for proper C array parameter declaration
+            for (const auto& dim : dimensions) {
+                int size = dim.upperBound - dim.lowerBound + 1 + 1;
+                dimensionSizes.push_back(std::to_string(size));
+            }
+        }
         
         // Add pointer type to each parameter
         for (size_t i = 0; i < paramDecls.size(); ++i) {
             if (i > 0) ss << ", ";
+            
+            // Get the parameter's variable name
             size_t last_space_pos = paramDecls[i].rfind(' ');
+            std::string paramName;
             if (last_space_pos != std::string::npos) {
-                std::string paramName = paramDecls[i].substr(last_space_pos + 1);
-                ss << typeStr << "* " << paramName;
+                paramName = paramDecls[i].substr(last_space_pos + 1);
+            } else {
+                paramName = paramDecls[i];
             }
-            else ss << typeStr << "*" << paramDecls[i];
+            
+            // Handle based on whether it's an array parameter or not
+            if (isArray) {
+                if (isMultidimensionalArray) {
+                    // For multidimensional arrays as parameters, use proper C syntax:
+                    // For a 2D array: type (*param)[dim2]
+                    // For a 3D array: type (*param)[dim2][dim3]
+                    ss << baseType << " (*" << paramName << ")";
+                    
+                    // Add all dimensions except the first, which is omitted in C array parameters
+                    for (size_t j = 1; j < dimensionSizes.size(); ++j) {
+                        ss << "[" << dimensionSizes[j] << "]";
+                    }
+                } else {
+                    // For single dimension arrays, we can use the simpler notation
+                    ss << baseType << " *" << paramName;
+                }
+            } else {
+                // Non-array parameter - regular pointer
+                ss << baseType << "* " << paramName;
+            }
         }
     } else {
         // If we can't find a space, just add the pointer to the whole string
@@ -1449,10 +1581,11 @@ std::any PascalToCTranslator::visitProcedureCall(PascalSParser::ProcedureCallCon
             // Check if this parameter should be passed by reference
             bool isReferenceParam = false;
             bool isArrayType = false;
+            bool isMultidimensionalArray = false;
             
             // Fix parameter ordering issue: The parameters in the scope's parameters list are 
             // stored in reverse order compared to how they appear in Pascal source.
-            // We need to reverse the index to match the correct parameter.
+            // So need to reverse the index to match the correct parameter.
             if (parameters.size() == args.size()) {
                 // Calculate the correct parameter index (parameters are in reverse order)
                 size_t paramIndex = parameters.size() - 1 - i;
@@ -1476,27 +1609,67 @@ std::any PascalToCTranslator::visitProcedureCall(PascalSParser::ProcedureCallCon
                     argBase = argBase.substr(0, parenPos);
                 }
                 
-                // Check if the argument is an array
+                // Check if the argument is an array and if it's multidimensional
                 if (symbolTable->hasSymbol(argBase)) {
                     const SymbolEntry& argEntry = symbolTable->getSymbol(argBase);
                     isArrayType = (argEntry.dataType == PascalType::ARRAY);
-                    TranslatorUtils::logDebug("    Arg " + argBase + " is array: " + (isArrayType ? "true" : "false"));
+                    isMultidimensionalArray = (isArrayType && argEntry.arrayDimensions.size() > 1);
+                    
+                    TranslatorUtils::logDebug("    Arg " + argBase + " is array: " + (isArrayType ? "true" : "false") + 
+                                             ", is multidimensional: " + (isMultidimensionalArray ? "true" : "false") +
+                                             ", dimensions: " + std::to_string(argEntry.arrayDimensions.size()));
                 }
                 
-                // Add '&' for reference parameters that are not arrays and don't have array indexing or function call
-                // Also don't add '&' if the expression already starts with a '*' (it's already a reference parameter being dereferenced)
-                if (isReferenceParam && !isArrayType && 
-                    args[i].find('[') == std::string::npos && 
-                    args[i].find('(') == std::string::npos && 
-                    !args[i].empty() && args[i][0] != '*') {
+                // Handle regular arrays and multidimensional arrays differently
+                if (isArrayType) {
+                    // If it's an array indexing operation, we need to check if we're passing a slice of the array
+                    if (args[i].find('[') != std::string::npos) {
+                        // Count the number of dimensions in the original array vs. the array access
+                        int accessedDimensions = 0;
+                        size_t pos = 0;
+                        while ((pos = args[i].find('[', pos)) != std::string::npos) {
+                            accessedDimensions++;
+                            pos++;
+                        }
+                        
+                        // If using the parameter as an array, check dimensions
+                        bool isFullyIndexed = false;
+                        if (symbolTable->hasSymbol(argBase)) {
+                            const SymbolEntry& argEntry = symbolTable->getSymbol(argBase);
+                            isFullyIndexed = (accessedDimensions >= argEntry.arrayDimensions.size());
+                        }
+                        
+                        // If we're passing a slice or the parameter expects an array
+                        if (!isFullyIndexed) {
+                            // Pass the array element directly (it's a slice of the multidimensional array)
+                            ss << args[i];
+                        } else {
+                            // Pass the fully indexed element (might need & if it's a VAR parameter)
+                            if (isReferenceParam) {
+                                ss << "&" << args[i];
+                            } else {
+                                ss << args[i];
+                            }
+                        }
+                    } else {
+                        // Passing the whole array - no & needed as arrays are passed by reference by default
+                        ss << args[i];
+                    }
+                }
+                // For non-array parameters that are passed by reference
+                else if (isReferenceParam &&
+                         args[i].find('[') == std::string::npos &&
+                         args[i].find('(') == std::string::npos &&
+                         !args[i].empty() && args[i][0] != '*') {
                     ss << "&" << args[i];
                     TranslatorUtils::logDebug("  Adding & to " + args[i]);
                 } else {
+                    // Regular value parameter
                     ss << args[i];
-                    if (isReferenceParam && isArrayType) {
-                        TranslatorUtils::logDebug("  NOT adding & to array " + args[i]);
-                    }
                 }
+            } else {
+                // If we can't match parameters, just pass the argument as-is
+                ss << args[i];
             }
         }
 
@@ -1689,6 +1862,7 @@ std::any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *context)
             // Check if this parameter should be passed by reference
             bool isReferenceParam = false;
             bool isArrayType = false;
+            bool isMultidimensionalArray = false;
             
             // Fix parameter ordering issue: The parameters in the scope's parameters list are 
             // stored in reverse order compared to how they appear in Pascal source.
@@ -1716,27 +1890,67 @@ std::any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *context)
                     argBase = argBase.substr(0, parenPos);
                 }
                 
-                // Check if the argument is an array
+                // Check if the argument is an array and if it's multidimensional
                 if (symbolTable->hasSymbol(argBase)) {
                     const SymbolEntry& argEntry = symbolTable->getSymbol(argBase);
                     isArrayType = (argEntry.dataType == PascalType::ARRAY);
-                    TranslatorUtils::logDebug("    Arg " + argBase + " is array: " + (isArrayType ? "true" : "false"));
+                    isMultidimensionalArray = (isArrayType && argEntry.arrayDimensions.size() > 1);
+                    
+                    TranslatorUtils::logDebug("    Arg " + argBase + " is array: " + (isArrayType ? "true" : "false") + 
+                                             ", is multidimensional: " + (isMultidimensionalArray ? "true" : "false") +
+                                             ", dimensions: " + std::to_string(argEntry.arrayDimensions.size()));
                 }
                 
-                // Add '&' for reference parameters that are not arrays and don't have array indexing or function call
-                // Also don't add '&' if the expression already starts with a '*' (it's already a reference parameter being dereferenced)
-                if (isReferenceParam && !isArrayType && 
-                    args[i].find('[') == std::string::npos && 
-                    args[i].find('(') == std::string::npos && 
-                    !args[i].empty() && args[i][0] != '*') {
+                // Handle regular arrays and multidimensional arrays differently
+                if (isArrayType) {
+                    // If it's an array indexing operation, we need to check if we're passing a slice of the array
+                    if (args[i].find('[') != std::string::npos) {
+                        // Count the number of dimensions in the original array vs. the array access
+                        int accessedDimensions = 0;
+                        size_t pos = 0;
+                        while ((pos = args[i].find('[', pos)) != std::string::npos) {
+                            accessedDimensions++;
+                            pos++;
+                        }
+                        
+                        // If using the parameter as an array, check dimensions
+                        bool isFullyIndexed = false;
+                        if (symbolTable->hasSymbol(argBase)) {
+                            const SymbolEntry& argEntry = symbolTable->getSymbol(argBase);
+                            isFullyIndexed = (accessedDimensions >= argEntry.arrayDimensions.size());
+                        }
+                        
+                        // If we're passing a slice or the parameter expects an array
+                        if (!isFullyIndexed) {
+                            // Pass the array element directly (it's a slice of the multidimensional array)
+                            ss << args[i];
+                        } else {
+                            // Pass the fully indexed element (might need & if it's a VAR parameter)
+                            if (isReferenceParam) {
+                                ss << "&" << args[i];
+                            } else {
+                                ss << args[i];
+                            }
+                        }
+                    } else {
+                        // Passing the whole array - no & needed as arrays are passed by reference by default
+                        ss << args[i];
+                    }
+                }
+                // For non-array parameters that are passed by reference
+                else if (isReferenceParam && 
+                         args[i].find('[') == std::string::npos && 
+                         args[i].find('(') == std::string::npos && 
+                         !args[i].empty() && args[i][0] != '*') {
                     ss << "&" << args[i];
                     TranslatorUtils::logDebug("  Adding & to " + args[i]);
                 } else {
+                    // Regular value parameter
                     ss << args[i];
-                    if (isReferenceParam && isArrayType) {
-                        TranslatorUtils::logDebug("  NOT adding & to array " + args[i]);
-                    }
                 }
+            } else {
+                // If we can't match parameters, just pass the argument as-is
+                ss << args[i];
             }
         }
 

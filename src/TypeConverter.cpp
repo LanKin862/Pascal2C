@@ -49,6 +49,7 @@ std::string TypeConverter::convertArrayType(PascalType elementType, const std::v
 
     // Add dimensions in C style (e.g., int[10] for array[1..10] of integer)
     // For each dimension, we calculate the size as (upperBound - lowerBound + 1)
+    // Keep dimensions in the same order as they appear in Pascal
     for (const auto& dim : dimensions) {
         int size = dim.upperBound - dim.lowerBound + 1;
         ss << "[" << size << "]";
