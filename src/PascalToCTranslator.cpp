@@ -274,11 +274,11 @@ std::any PascalToCTranslator::visitVarDeclaration(PascalSParser::VarDeclarationC
 
     // Output variable declarations
     for (const auto &id : ids) {
-        // For array types, don't add initialization
-        if (pascalType == PascalType::ARRAY) {
-            output << typeStr << " " << id << ";\n";
-        } else {
-            output << typeStr << " " << id;
+        // Output the variable declaration with its type
+        output << typeStr << " " << id;
+        
+        // Only add initialization for non-array types
+        if (pascalType != PascalType::ARRAY) {
             // Initialize with default values based on type
             if (pascalType == PascalType::INTEGER) {
                 output << " = 0";
@@ -289,8 +289,8 @@ std::any PascalToCTranslator::visitVarDeclaration(PascalSParser::VarDeclarationC
             } else if (pascalType == PascalType::CHAR) {
                 output << " = '\\0'";
             }
-            output << ";\n";
         }
+        output << ";\n";
 
         // Add to symbol table
         SymbolEntry entry;
@@ -628,6 +628,7 @@ std::any PascalToCTranslator::visitStatement(PascalSParser::StatementContext *co
         std::string currentScopeName = symbolTable->getCurrentScope().getScopeName();
 
         if (currentScopeName == id) {
+            // Pascal Function:=Value syntax translated to C return statement
             output << getCurrentIndentation() << "return " << expr << ";\n";
         } else {
             output << getCurrentIndentation() << id << " = " << expr << ";\n";
@@ -637,27 +638,35 @@ std::any PascalToCTranslator::visitStatement(PascalSParser::StatementContext *co
     else if (context->variable() && context->ASSIGNOP()) {
         auto varResult = visit(context->variable());
         
-        // Check if this is a function result assignment using try-catch
+        // Check if this is a function result assignment
         try {
-            auto pair = std::any_cast<std::pair<std::string, std::string>>(varResult);
-            if (pair.first == "FUNCTION_RESULT") {
-                // This is a function result assignment
-                auto exprResult = visit(context->expression());
-                std::string expr = std::any_cast<std::string>(exprResult);
-                
-                output << getCurrentIndentation() << "return " << expr << ";\n";
-                return std::any();
+            if (varResult.type() == typeid(std::pair<std::string, std::string>)) {
+                auto pair = std::any_cast<std::pair<std::string, std::string>>(varResult);
+                if (pair.first == "FUNCTION_RESULT") {
+                    // This is a function result assignment (Pascal function:=value)
+                    auto exprResult = visit(context->expression());
+                    std::string expr = std::any_cast<std::string>(exprResult);
+                    
+                    output << getCurrentIndentation() << "return " << expr << ";\n";
+                    return std::any();
+                }
             }
-        } catch (const std::bad_any_cast&) {
-            // Not a function result assignment, continue with normal variable assignment
+        } catch (const std::bad_any_cast& e) {
+            // If there's a cast error, assume it's a regular variable assignment
+            TranslatorUtils::logError("Warning: Type conversion issue in variable assignment: " + std::string(e.what()));
         }
         
-        // Regular variable assignment
-        std::string var = std::any_cast<std::string>(varResult);
-        auto exprResult = visit(context->expression());
-        std::string expr = std::any_cast<std::string>(exprResult);
+        // Regular variable assignment - try with explicit string cast
+        try {
+            std::string var = std::any_cast<std::string>(varResult);
+            auto exprResult = visit(context->expression());
+            std::string expr = std::any_cast<std::string>(exprResult);
 
-        output << getCurrentIndentation() << var << " = " << expr << ";\n";
+            output << getCurrentIndentation() << var << " = " << expr << ";\n";
+        } catch (const std::bad_any_cast& e) {
+            // If cast fails again, add error handling
+            TranslatorUtils::logError("Error in variable assignment: " + std::string(e.what()));
+        }
     }
     // Procedure call
     else if (context->procedureCall()) {
@@ -748,51 +757,55 @@ std::any PascalToCTranslator::visitForStatement(PascalSParser::ForStatementConte
 }
 
 std::any PascalToCTranslator::visitReadStatement(PascalSParser::ReadStatementContext *context) {
-    // Get variable list
-    auto result = visit(context->variableList());
-    std::vector<std::string> vars = std::any_cast<std::vector<std::string>>(result);
+    try {
+        // Get variable list
+        auto result = visit(context->variableList());
+        std::vector<std::string> vars = std::any_cast<std::vector<std::string>>(result);
 
-    // Output read statements for each variable
-    for (const auto &var : vars) {
-        // Check if it's an array access
-        std::string baseVar = var;
-        size_t bracketPos = var.find('[');
-        bool isArrayAccess = false;
-        
-        if (bracketPos != std::string::npos) {
-            baseVar = var.substr(0, bracketPos);
-            isArrayAccess = true;
-        }
-        
-        if (symbolTable->hasSymbol(baseVar)) {
-            const SymbolEntry &entry = symbolTable->getSymbol(baseVar);
-            std::string format;
-
-            if (isArrayAccess && entry.dataType == PascalType::ARRAY) {
-                // Use the array element type for the format
-                switch (entry.arrayElementType) {
-                    case PascalType::INTEGER: format = "\"%d\""; break;
-                    case PascalType::REAL: format = "\"%f\""; break;
-                    case PascalType::CHAR: format = "\" %c\""; break;
-                    case PascalType::BOOLEAN: format = "\"%d\""; break;
-                    default: format = "\"%d\""; break;
-                }
-            } else {
-                // Use the variable's own type
-                switch (entry.dataType) {
-                    case PascalType::INTEGER: format = "\"%d\""; break;
-                    case PascalType::REAL: format = "\"%f\""; break;
-                    case PascalType::CHAR: format = "\" %c\""; break;
-                    case PascalType::BOOLEAN: format = "\"%d\""; break;
-                    default: format = "\"%s\""; break;
-                }
+        // Output read statements for each variable
+        for (const auto &var : vars) {
+            // Check if it's an array access
+            std::string baseVar = var;
+            size_t bracketPos = var.find('[');
+            bool isArrayAccess = false;
+            
+            if (bracketPos != std::string::npos) {
+                baseVar = var.substr(0, bracketPos);
+                isArrayAccess = true;
             }
+            
+            if (symbolTable->hasSymbol(baseVar)) {
+                const SymbolEntry &entry = symbolTable->getSymbol(baseVar);
+                std::string format;
 
-            output << getCurrentIndentation() << "scanf(" << format << ", &" << var << ");\n";
-        } else {
-            // Default to integer if type is unknown
-            output << getCurrentIndentation() << "scanf(\"%d\", &" << var << ");\n";
+                if (isArrayAccess && entry.dataType == PascalType::ARRAY) {
+                    // Use the array element type for the format
+                    switch (entry.arrayElementType) {
+                        case PascalType::INTEGER: format = "\"%d\""; break;
+                        case PascalType::REAL: format = "\"%f\""; break;
+                        case PascalType::CHAR: format = "\" %c\""; break;
+                        case PascalType::BOOLEAN: format = "\"%d\""; break;
+                        default: format = "\"%d\""; break;
+                    }
+                } else {
+                    // Use the variable's own type
+                    switch (entry.dataType) {
+                        case PascalType::INTEGER: format = "\"%d\""; break;
+                        case PascalType::REAL: format = "\"%f\""; break;
+                        case PascalType::CHAR: format = "\" %c\""; break;
+                        case PascalType::BOOLEAN: format = "\"%d\""; break;
+                        default: format = "\"%s\""; break;
+                    }
+                }
+
+                output << getCurrentIndentation() << "scanf(" << format << ", &" << var << ");\n";
+            } else {
+                // Default to integer if type is unknown
+                output << getCurrentIndentation() << "scanf(\"%d\", &" << var << ");\n";
+            }
         }
+    } catch (const std::bad_any_cast& e) {
+        TranslatorUtils::logError("Type conversion error in read statement: " + std::string(e.what()));
     }
 
     return std::any();
@@ -901,7 +914,15 @@ std::any PascalToCTranslator::visitVariableList(PascalSParser::VariableListConte
 
     // Get first variable
     auto result = visit(context->variable());
-    vars.push_back(std::any_cast<std::string>(result));
+    
+    // Handle potential function return value marker
+    if (result.type() == typeid(std::pair<std::string, std::string>)) {
+        auto pair = std::any_cast<std::pair<std::string, std::string>>(result);
+        vars.push_back(pair.second);  // Use the function name
+    } else {
+        // Regular variable
+        vars.push_back(std::any_cast<std::string>(result));
+    }
 
     // Get additional variables if any
     if (context->variableList()) {
@@ -917,24 +938,26 @@ std::any PascalToCTranslator::visitVariableList(PascalSParser::VariableListConte
 std::any PascalToCTranslator::visitVariable(PascalSParser::VariableContext *context) {
     std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
 
-    // Check if the variable is a function name in the current scope
+    // Check if the variable is a function name in the current scope or any parent function scope
     // If so, we need to return special information to handle function results
     std::string currentScopeName = symbolTable->getCurrentScope().getScopeName();
-    if (currentScopeName == id && context->idVarPart() == nullptr) {
-        // We're assigning to the function name itself - this sets the return value
-        // We'll return a special marker that can be detected in visitStatement
-        return std::make_pair("FUNCTION_RESULT", id);
+    
+    // Check if we're in a function and the variable name matches the function name
+    if (id == currentScopeName) {
+        // This is a function return value assignment (function:=value)
+        std::pair<std::string, std::string> resultPair("FUNCTION_RESULT", id);
+        return resultPair;
     }
-
+    
     // Check if it's an array access
     if (context->idVarPart()) {
         auto result = visit(context->idVarPart());
         std::string indices = std::any_cast<std::string>(result);
 
-        return id + indices;
+        return std::string(id + indices);
     }
 
-    return id;
+    return std::string(id);
 }
 
 std::any PascalToCTranslator::visitIdVarPart(PascalSParser::IdVarPartContext *context) {
@@ -999,16 +1022,20 @@ std::any PascalToCTranslator::visitElsePart(PascalSParser::ElsePartContext *cont
 std::any PascalToCTranslator::visitExpressionList(PascalSParser::ExpressionListContext *context) {
     std::vector<std::string> exprs;
 
-    // Get first expression
-    auto result = visit(context->expression());
-    exprs.push_back(std::any_cast<std::string>(result));
+    try {
+        // Get first expression
+        auto result = visit(context->expression());
+        exprs.push_back(std::any_cast<std::string>(result));
 
-    // Get additional expressions if any
-    if (context->expressionList()) {
-        auto moreExprs = visit(context->expressionList());
-        std::vector<std::string> moreExprsVec = std::any_cast<std::vector<std::string>>(moreExprs);
+        // Get additional expressions if any
+        if (context->expressionList()) {
+            auto moreExprs = visit(context->expressionList());
+            std::vector<std::string> moreExprsVec = std::any_cast<std::vector<std::string>>(moreExprs);
 
-        exprs.insert(exprs.end(), moreExprsVec.begin(), moreExprsVec.end());
+            exprs.insert(exprs.end(), moreExprsVec.begin(), moreExprsVec.end());
+        }
+    } catch (const std::bad_any_cast& e) {
+        TranslatorUtils::logError("Type conversion error in expression list: " + std::string(e.what()));
     }
 
     return exprs;
