@@ -757,12 +757,41 @@ std::any PascalToCTranslator::visitVarParameter(PascalSParser::VarParameterConte
     }
 
     // Add pointer (*) for reference parameters to the type part of the declaration
+    // We need to handle multiple parameters in the chain
+    std::stringstream ss;
+    std::string typeStr;
     size_t pos = params.find_first_of(" ");
     if (pos != std::string::npos) {
-        params.insert(pos, "*");
+        typeStr = params.substr(0, pos);
+        std::string rest = params.substr(pos);
+        std::cout << "rest: " << rest << std::endl;
+        
+        // Split the rest into individual parameter declarations
+        std::vector<std::string> paramDecls;
+        size_t start = 0;
+        size_t commaPos;
+        while ((commaPos = rest.find(",", start)) != std::string::npos) {
+            paramDecls.push_back(rest.substr(start, commaPos - start));
+            start = commaPos + 1; // Skip ","
+        }
+        paramDecls.push_back(rest.substr(start));
+        
+        // Add pointer type to each parameter
+        for (size_t i = 0; i < paramDecls.size(); ++i) {
+            if (i > 0) ss << ", ";
+            size_t last_space_pos = paramDecls[i].rfind(' ');
+            if (last_space_pos != std::string::npos) {
+                std::string paramName = paramDecls[i].substr(last_space_pos + 1);
+                ss << typeStr << "* " << paramName;
+            }
+            else ss << typeStr << "*" << paramDecls[i];
+        }
+    } else {
+        // If we can't find a space, just add the pointer to the whole string
+        ss << params << "*";
     }
 
-    return params;
+    return ss.str();
 }
 
 /**
