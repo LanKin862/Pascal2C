@@ -9,6 +9,10 @@
 #include "../antlr/PascalSParser.h"
 #include "../include/TranslatorUtils.h"
 
+/**
+ * Constructor for the Pascal to C translator
+ * Initializes the symbol table, type converter, and other state variables
+ */
 PascalToCTranslator::PascalToCTranslator() : symbolTable(std::make_unique<SymbolTable>()),
                                              typeConverter(std::make_unique<TypeConverter>()),
                                              indentation(""),
@@ -16,14 +20,19 @@ PascalToCTranslator::PascalToCTranslator() : symbolTable(std::make_unique<Symbol
                                              tempVarCounter(0) {
 }
 
+/**
+ * Main translation method that converts Pascal code to C code
+ * @param inputFile Path to the Pascal source file
+ * @return String containing the translated C code
+ */
 std::string PascalToCTranslator::translate(const std::string &inputFile) {
-    // Clear state
+    // Clear state for a fresh translation
     output.str("");
     indentation = "";
     isInGlobalScope = true;
     tempVarCounter = 0;
 
-    // Set up ANTLR
+    // Set up ANTLR parser components
     std::ifstream stream;
     stream.open(inputFile);
     antlr4::ANTLRInputStream input(stream);
@@ -31,10 +40,10 @@ std::string PascalToCTranslator::translate(const std::string &inputFile) {
     antlr4::CommonTokenStream tokens(&lexer);
     PascalSParser parser(&tokens);
 
-    // Parse the input
+    // Parse the input file to generate the AST
     PascalSParser::ProgramContext *tree = parser.program();
 
-    // Visit the parse tree
+    // Visit the parse tree and generate C code
     try {
         visitProgram(tree);
     } catch (const TranslatorException &e) {
@@ -46,33 +55,54 @@ std::string PascalToCTranslator::translate(const std::string &inputFile) {
     return output.str();
 }
 
+/**
+ * Increases the indentation level by one unit (4 spaces)
+ */
 void PascalToCTranslator::increaseIndentation() {
     indentation += "    ";
 }
 
+/**
+ * Decreases the indentation level by one unit (4 spaces)
+ * Ensures indentation doesn't go negative
+ */
 void PascalToCTranslator::decreaseIndentation() {
     if (!indentation.empty()) {
         indentation.resize(indentation.size() - 4);
     }
 }
 
+/**
+ * Returns the current indentation string
+ * @return Current indentation as a string of spaces
+ */
 std::string PascalToCTranslator::getCurrentIndentation() const {
     return indentation;
 }
 
+/**
+ * Generates a unique temporary variable name
+ * @return A string representing a new temporary variable
+ */
 std::string PascalToCTranslator::getNextTempVar() {
     return "temp_" + std::to_string(tempVarCounter++);
 }
 
+/**
+ * Processes the program node, which is the root of the parse tree
+ * Generates standard includes and helper functions needed by Pascal programs
+ * @param context The program context from the parser
+ * @return Standard placeholder for visitor pattern
+ */
 std::any PascalToCTranslator::visitProgram(PascalSParser::ProgramContext *context) {
-    // Generate standard includes
+    // Generate standard C includes needed for Pascal functionality
     output << "#include <stdio.h>\n";
     output << "#include <stdlib.h>\n";
     output << "#include <stdbool.h>\n";
     output << "#include <string.h>\n";
     output << "#include <stdarg.h>\n\n";
 
-    // Define Pascal-specific functions and types
+    // Define Pascal-specific types and helper functions
     output << "// Pascal-specific functions and types\n";
     output << "typedef int boolean;\n";
     output << "typedef char *string;\n\n";
@@ -88,42 +118,57 @@ std::any PascalToCTranslator::visitProgram(PascalSParser::ProgramContext *contex
     output << "    va_end(args);\n";
     output << "}\n\n";
 
-    // Visit the program structure
+    // Visit the program structure node
     return visit(context->programStruct());
 }
 
+/**
+ * Processes the program structure which consists of a header and body
+ * @param context The program structure context from the parser
+ * @return Standard placeholder for visitor pattern
+ */
 std::any PascalToCTranslator::visitProgramStruct(PascalSParser::ProgramStructContext *context) {
-    // Visit the program header
+    // Visit the program header (name and parameters)
     visit(context->programHead());
 
-    // Visit the program body
+    // Visit the program body (declarations and statements)
     visit(context->programBody());
 
     return std::any();
 }
 
+/**
+ * Processes the program header which contains the program name
+ * @param context The program header context from the parser
+ * @return Standard placeholder for visitor pattern
+ */
 std::any PascalToCTranslator::visitProgramHead(PascalSParser::ProgramHeadContext *context) {
-    // Get the program name
+    // Extract the program name
     std::string programName = context->ID()->getText();
 
-    // Add program name as a comment
+    // Add program name as a comment in the C code
     output << "// Program: " << programName << "\n\n";
 
     return std::any();
 }
 
+/**
+ * Processes the program body which contains declarations and compound statements
+ * @param context The program body context from the parser
+ * @return Standard placeholder for visitor pattern
+ */
 std::any PascalToCTranslator::visitProgramBody(PascalSParser::ProgramBodyContext *context) {
-    // Visit const declarations
+    // Process constant declarations if present
     if (context->constDeclarations()) {
         visit(context->constDeclarations());
     }
 
-    // Visit var declarations
+    // Process variable declarations if present
     if (context->varDeclarations()) {
         visit(context->varDeclarations());
     }
     
-    // First create forward declarations for all subprograms to facilitate reference parameter detection
+    // First create forward declarations for all subprograms to handle function references
     if (context->subprogramDeclarations()) {
         // Create a temporary string stream to collect forward declarations
         std::stringstream forwardDeclsStream;
@@ -140,21 +185,21 @@ std::any PascalToCTranslator::visitProgramBody(PascalSParser::ProgramBodyContext
         output << forwardDecls;
     }
 
-    // Visit subprogram declarations
+    // Process subprogram (function/procedure) declarations if present
     if (context->subprogramDeclarations()) {
         visit(context->subprogramDeclarations());
     }
 
-    // Generate main function
+    // Generate the main function
     output << "int main() {\n";
     increaseIndentation();
 
-    // Visit compound statement
+    // Visit the main program's compound statement
     if (context->compoundStatement()) {
         visit(context->compoundStatement());
     }
 
-    // Return 0
+    // Add return statement to main
     output << getCurrentIndentation() << "return 0;\n";
 
     decreaseIndentation();
@@ -163,7 +208,11 @@ std::any PascalToCTranslator::visitProgramBody(PascalSParser::ProgramBodyContext
     return std::any();
 }
 
-// Helper method to generate forward declarations
+/**
+ * Helper method to generate forward declarations for all functions and procedures
+ * This is needed to handle function references and maintain proper parameter types
+ * @param context The subprogram declarations context
+ */
 void PascalToCTranslator::generateForwardDeclarations(PascalSParser::SubprogramDeclarationsContext *context) {
     if (!context) return;
     
@@ -204,10 +253,15 @@ void PascalToCTranslator::generateForwardDeclarations(PascalSParser::SubprogramD
     }
 }
 
+/**
+ * Processes an identifier list, used for variable and parameter declarations
+ * @param context The identifier list context from the parser
+ * @return Vector of C-compatible identifier strings
+ */
 std::any PascalToCTranslator::visitIdList(PascalSParser::IdListContext *context) {
     std::vector<std::string> ids;
 
-    // Collect all identifiers
+    // Collect all identifiers and convert them to C-compatible names
     for (auto id : context->ID()) {
         ids.push_back(TranslatorUtils::toCIdentifier(id->getText()));
     }
@@ -215,6 +269,11 @@ std::any PascalToCTranslator::visitIdList(PascalSParser::IdListContext *context)
     return ids;
 }
 
+/**
+ * Processes constant declarations section
+ * @param context The constant declarations context
+ * @return Standard placeholder for visitor pattern
+ */
 std::any PascalToCTranslator::visitConstDeclarations(PascalSParser::ConstDeclarationsContext *context) {
     // Check if there are any constant declarations
     if (!context->constDeclaration()) {
@@ -223,7 +282,7 @@ std::any PascalToCTranslator::visitConstDeclarations(PascalSParser::ConstDeclara
 
     output << "// Constants\n";
 
-    // Visit const declaration
+    // Visit constant declaration nodes
     visit(context->constDeclaration());
 
     output << "\n";
@@ -231,20 +290,29 @@ std::any PascalToCTranslator::visitConstDeclarations(PascalSParser::ConstDeclara
     return std::any();
 }
 
+/**
+ * Processes individual constant declarations
+ * Converts Pascal constants to C #define statements
+ * @param context The constant declaration context
+ * @return Standard placeholder for visitor pattern
+ */
 std::any PascalToCTranslator::visitConstDeclaration(PascalSParser::ConstDeclarationContext *context) {
-    // First constant declaration
+    // Get constant name and convert to C identifier
     std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
+    
+    // Get constant value
     std::string value = std::any_cast<std::string>(visit(context->constValue()));
 
+    // Output as a C preprocessor define
     output << "#define " << id << " " << value << "\n";
 
-    // Add to symbol table
+    // Add constant to symbol table
     SymbolEntry entry;
     entry.name = id;
     entry.symbolType = SymbolType::CONSTANT;
     entry.value = value;
 
-    // Try to infer the type from the value
+    // Try to infer the type from the value's format
     if (value.find('.') != std::string::npos) {
         entry.dataType = PascalType::REAL;
     } else if (value == "0" || value == "1") {
@@ -257,7 +325,7 @@ std::any PascalToCTranslator::visitConstDeclaration(PascalSParser::ConstDeclarat
 
     symbolTable->addSymbol(entry);
 
-    // Process additional constant declarations if any
+    // Process additional constant declarations if any (recursively)
     if (context->constDeclaration()) {
         visit(context->constDeclaration());
     }
@@ -265,8 +333,14 @@ std::any PascalToCTranslator::visitConstDeclaration(PascalSParser::ConstDeclarat
     return std::any();
 }
 
+/**
+ * Processes constant values including numbers, letters, and strings
+ * @param context The constant value context
+ * @return String representation of the constant value
+ */
 std::any PascalToCTranslator::visitConstValue(PascalSParser::ConstValueContext *context) {
     if (context->num()) {
+        // Handle numeric constants, preserving sign
         if (context->PLUS()) {
             return "+" + context->num()->getText();
         } else if (context->MINUS()) {
@@ -275,14 +349,21 @@ std::any PascalToCTranslator::visitConstValue(PascalSParser::ConstValueContext *
             return context->num()->getText();
         }
     } else if (context->LETTER()) {
+        // Handle character constants
         return context->LETTER()->getText();
     } else if (context->STRING()) {
+        // Handle string constants
         return context->STRING()->getText();
     }
 
     return std::string("");
 }
 
+/**
+ * Processes variable declarations section
+ * @param context The variable declarations context
+ * @return Standard placeholder for visitor pattern
+ */
 std::any PascalToCTranslator::visitVarDeclarations(PascalSParser::VarDeclarationsContext *context) {
     // Check if there are any variable declarations
     if (!context->varDeclaration()) {
@@ -291,7 +372,7 @@ std::any PascalToCTranslator::visitVarDeclarations(PascalSParser::VarDeclaration
 
     output << "// Variables\n";
 
-    // Visit var declaration
+    // Visit variable declaration nodes
     visit(context->varDeclaration());
 
     output << "\n";
@@ -299,17 +380,23 @@ std::any PascalToCTranslator::visitVarDeclarations(PascalSParser::VarDeclaration
     return std::any();
 }
 
+/**
+ * Processes individual variable declarations
+ * Converts Pascal variable declarations to C variable declarations with initialization
+ * @param context The variable declaration context
+ * @return Standard placeholder for visitor pattern
+ */
 std::any PascalToCTranslator::visitVarDeclaration(PascalSParser::VarDeclarationContext *context) {
-    // Get identifiers
+    // Get list of variable identifiers
     std::vector<std::string> ids = std::any_cast<std::vector<std::string>>(visit(context->idList()));
 
-    // Get type
+    // Get type information
     auto typeResult = visit(context->type());
     
     // Initialize variables for type information
     std::string typeStr;
     PascalType pascalType;
-    PascalType elementType = PascalType::INTEGER; // Default
+    PascalType elementType = PascalType::INTEGER; // Default element type for arrays
     std::vector<ArrayBounds> dimensions;
     
     // Extract type information based on whether it's an array or basic type
@@ -319,7 +406,7 @@ std::any PascalToCTranslator::visitVarDeclaration(PascalSParser::VarDeclarationC
         typeStr = typePair.first;
         pascalType = typePair.second;
     } catch (const std::bad_any_cast&) {
-        // If it fails, it's an array type
+        // If not a basic type, it's an array type
         try {
             auto arrayTypeInfo = std::any_cast<std::tuple<std::string, PascalType, PascalType, std::vector<ArrayBounds>>>(typeResult);
             typeStr = std::get<0>(arrayTypeInfo);
@@ -331,21 +418,22 @@ std::any PascalToCTranslator::visitVarDeclaration(PascalSParser::VarDeclarationC
         }
     }
 
-    // Output variable declarations
+    // Output variable declarations for each identifier
     for (auto &id : ids) {
-        // Output the variable declaration with its type
+        // Handle array types with array dimensions in the type string
         std::regex pattern("\\[.*?\\]");
         std::smatch matches;
         if (std::regex_search(typeStr, matches, pattern)) {
-            // Array type
+            // For array types, put the dimensions after the identifier
             std::string tmpId = id + std::string(matches[0]);
             std::string tmpTypeStr = std::regex_replace(typeStr, pattern, "");
             output << tmpTypeStr << " " << tmpId;
         } else {
-            // Basic type
+            // For basic types, standard format
             output << typeStr << " " << id;
         }
-        // Only add initialization for non-array types
+        
+        // Only add initialization for non-array types (arrays are more complex to initialize)
         if (pascalType != PascalType::ARRAY) {
             // Initialize with default values based on type
             if (pascalType == PascalType::INTEGER) {
@@ -353,14 +441,14 @@ std::any PascalToCTranslator::visitVarDeclaration(PascalSParser::VarDeclarationC
             } else if (pascalType == PascalType::REAL) {
                 output << " = 0.0";
             } else if (pascalType == PascalType::BOOLEAN) {
-                output << " = 0";  // false
+                output << " = 0";  // false in C
             } else if (pascalType == PascalType::CHAR) {
                 output << " = '\\0'";
             }
         }
         output << ";\n";
 
-        // Add to symbol table
+        // Add variable to symbol table for type checking and reference
         SymbolEntry entry;
         entry.name = id;
         entry.symbolType = SymbolType::VARIABLE;
@@ -375,7 +463,7 @@ std::any PascalToCTranslator::visitVarDeclaration(PascalSParser::VarDeclarationC
         symbolTable->addSymbol(entry);
     }
 
-    // Process additional variable declarations if any
+    // Process additional variable declarations if any (recursively)
     if (context->varDeclaration()) {
         visit(context->varDeclaration());
     }
@@ -383,31 +471,42 @@ std::any PascalToCTranslator::visitVarDeclaration(PascalSParser::VarDeclarationC
     return std::any();
 }
 
+/**
+ * Processes type declarations, handling both basic types and arrays
+ * @param context The type context
+ * @return Type information as either a pair (for basic types) or tuple (for array types)
+ */
 std::any PascalToCTranslator::visitType(PascalSParser::TypeContext *context) {
     if (context->basicType() && context->ARRAY() == nullptr) {
+        // Basic type (integer, real, boolean, char)
         auto result = visit(context->basicType());
         PascalType type = std::any_cast<PascalType>(result);
         std::string typeStr = typeConverter->convertType(type);
         return std::make_pair(typeStr, type);
     } else if (context->ARRAY()) {
-        // Array type
+        // Array type with dimensions
         auto basicTypeResult = visit(context->basicType());
         PascalType elementType = std::any_cast<PascalType>(basicTypeResult);
 
-        // Get array dimensions
+        // Get array dimensions (bounds)
         auto periodResult = visit(context->period());
         std::vector<ArrayBounds> dimensions = std::any_cast<std::vector<ArrayBounds>>(periodResult);
 
-        // Convert to C array type
+        // Convert to C array type using the type converter
         std::string arrayTypeStr = typeConverter->convertArrayType(elementType, dimensions);
 
-        // Return array type, element type, and dimensions
+        // Return array type, element type, and dimensions as a tuple
         return std::make_tuple(arrayTypeStr, PascalType::ARRAY, elementType, dimensions);
     }
 
     throw TranslatorException("Unknown type");
 }
 
+/**
+ * Processes basic type keywords (INTEGER, REAL, BOOLEAN, CHAR)
+ * @param context The basic type context
+ * @return PascalType enum value representing the type
+ */
 std::any PascalToCTranslator::visitBasicType(PascalSParser::BasicTypeContext *context) {
     if (context->INTEGER()) {
         return PascalType::INTEGER;
@@ -422,10 +521,15 @@ std::any PascalToCTranslator::visitBasicType(PascalSParser::BasicTypeContext *co
     throw TranslatorException("Unknown basic type");
 }
 
+/**
+ * Processes array index range declarations (e.g., 1..10, 0..9)
+ * @param context The period context containing range bounds
+ * @return Vector of ArrayBounds structures with lower and upper bounds
+ */
 std::any PascalToCTranslator::visitPeriod(PascalSParser::PeriodContext *context) {
     std::vector<ArrayBounds> dimensions;
 
-    // Parse NUM DOTDOT NUM
+    // Parse pairs of numbers separated by DOTDOT (..)
     for (int i = 0; i < context->NUM().size(); i += 2) {
         if (i + 1 < context->NUM().size()) {
             ArrayBounds bounds;
@@ -438,6 +542,11 @@ std::any PascalToCTranslator::visitPeriod(PascalSParser::PeriodContext *context)
     return dimensions;
 }
 
+/**
+ * Processes subprogram (function/procedure) declarations
+ * @param context The subprogram declarations context
+ * @return Standard placeholder for visitor pattern
+ */
 std::any PascalToCTranslator::visitSubprogramDeclarations(PascalSParser::SubprogramDeclarationsContext *context) {
     // Check if there are any subprogram declarations
     if (!context->subprogramDeclarations() && !context->subprogram()) {
@@ -457,31 +566,42 @@ std::any PascalToCTranslator::visitSubprogramDeclarations(PascalSParser::Subprog
     return std::any();
 }
 
+/**
+ * Processes a single subprogram (function or procedure)
+ * @param context The subprogram context
+ * @return Standard placeholder for visitor pattern
+ */
 std::any PascalToCTranslator::visitSubprogram(PascalSParser::SubprogramContext *context) {
-    // Visit subprogram head
+    // Visit subprogram head to generate function signature
     visit(context->subprogramHead());
 
-    // Add opening brace
+    // Add opening brace for function body
     output << " {\n";
     increaseIndentation();
 
-    // Visit subprogram body
+    // Visit subprogram body to generate function implementation
     visit(context->subprogramBody());
 
-    // Add closing brace
+    // Add closing brace and extra newline
     decreaseIndentation();
     output << "}\n\n";
 
     return std::any();
 }
 
+/**
+ * Processes a subprogram header (function or procedure declaration)
+ * @param context The subprogram header context
+ * @return Standard placeholder for visitor pattern
+ */
 std::any PascalToCTranslator::visitSubprogramHead(PascalSParser::SubprogramHeadContext *context) {
-    // Get function/procedure name
+    // Get function/procedure name and convert to C identifier
     std::string name = TranslatorUtils::toCIdentifier(context->ID()->getText());
 
+    // Determine if this is a function or procedure
     bool isFunction = context->FUNCTION() != nullptr;
 
-    // Get return type for functions
+    // Get return type for functions (procedures default to void)
     std::string returnType = "void";
     PascalType pascalReturnType = PascalType::INTEGER;  // Default
 
@@ -491,7 +611,7 @@ std::any PascalToCTranslator::visitSubprogramHead(PascalSParser::SubprogramHeadC
         returnType = typeConverter->convertType(pascalReturnType);
     }
 
-    // Add function/procedure to the current scope before entering the function's scope
+    // Add function/procedure to the symbol table before entering its scope
     SymbolEntry entry;
     entry.name = name;
     entry.symbolType = isFunction ? SymbolType::FUNCTION : SymbolType::PROCEDURE;
@@ -501,15 +621,15 @@ std::any PascalToCTranslator::visitSubprogramHead(PascalSParser::SubprogramHeadC
     // Create a new scope for the function/procedure
     symbolTable->enterScope(name);
 
-    // Output function/procedure declaration
+    // Output function/procedure declaration with return type and name
     output << returnType << " " << name;
 
-    // Visit formal parameters
+    // Visit formal parameters section
     auto paramsResult = visit(context->formalParameter());
     std::string params = std::any_cast<std::string>(paramsResult);
 
     // In C, array parameters in function declarations should not include size specifications
-    // Replace array size brackets with empty brackets
+    // Replace array size brackets with empty brackets for C compatibility
     std::regex pattern("\\[.*?\\]");
     params = std::regex_replace(params, pattern, "");
     
@@ -518,19 +638,29 @@ std::any PascalToCTranslator::visitSubprogramHead(PascalSParser::SubprogramHeadC
     return std::any();
 }
 
+/**
+ * Processes formal parameter declarations for functions and procedures
+ * @param context The formal parameter context
+ * @return String representation of parameter list in C syntax
+ */
 std::any PascalToCTranslator::visitFormalParameter(PascalSParser::FormalParameterContext *context) {
     // Default empty parameter list
     if (!context->parameterList()) {
         return std::string("()");
     }
 
-    // Visit parameter list
+    // Visit parameter list to generate parameter declarations
     auto result = visit(context->parameterList());
     std::string params = std::any_cast<std::string>(result);
 
     return std::string("(") + params + ")";
 }
 
+/**
+ * Processes a list of parameters
+ * @param context The parameter list context
+ * @return String representation of all parameters, comma-separated
+ */
 std::any PascalToCTranslator::visitParameterList(PascalSParser::ParameterListContext *context) {
     std::string paramList = "";
     
@@ -562,6 +692,11 @@ std::any PascalToCTranslator::visitParameterList(PascalSParser::ParameterListCon
     return paramList;
 }
 
+/**
+ * Processes a single parameter, which can be either by value or by reference (VAR)
+ * @param context The parameter context
+ * @return String representation of the parameter in C syntax
+ */
 std::any PascalToCTranslator::visitParameter(PascalSParser::ParameterContext *context) {
     if (context->varParameter()) {
         TranslatorUtils::logDebug("Processing VAR parameter");
@@ -574,6 +709,13 @@ std::any PascalToCTranslator::visitParameter(PascalSParser::ParameterContext *co
     return std::string("");
 }
 
+/**
+ * Processes a VAR parameter (by reference)
+ * In Pascal, VAR parameters are passed by reference
+ * In C, this is implemented using pointers
+ * @param context The VAR parameter context
+ * @return String representation of the parameter in C syntax with pointer notation
+ */
 std::any PascalToCTranslator::visitVarParameter(PascalSParser::VarParameterContext *context) {
     // Get value parameter string representation
     auto result = visit(context->valueParameter());
@@ -583,7 +725,7 @@ std::any PascalToCTranslator::visitVarParameter(PascalSParser::VarParameterConte
     auto idListResult = visit(context->valueParameter()->idList());
     std::vector<std::string> ids = std::any_cast<std::vector<std::string>>(idListResult);
     
-    // Debug output
+    // Debug output to verify parameter identifiers
     std::string idListStr;
     for (const auto& id : ids) {
         if (!idListStr.empty()) idListStr += ", ";
@@ -614,7 +756,7 @@ std::any PascalToCTranslator::visitVarParameter(PascalSParser::VarParameterConte
         }
     }
 
-    // Add pointer for reference parameters
+    // Add pointer (*) for reference parameters to the type part of the declaration
     size_t pos = params.find_first_of(" ");
     if (pos != std::string::npos) {
         params.insert(pos, "*");
@@ -623,11 +765,17 @@ std::any PascalToCTranslator::visitVarParameter(PascalSParser::VarParameterConte
     return params;
 }
 
+/**
+ * Processes a value parameter (by value)
+ * In Pascal, regular parameters are passed by value
+ * @param context The value parameter context
+ * @return String representation of the parameter in C syntax
+ */
 std::any PascalToCTranslator::visitValueParameter(PascalSParser::ValueParameterContext *context) {
     // Get identifiers
     std::vector<std::string> ids = std::any_cast<std::vector<std::string>>(visit(context->idList()));
 
-    // Debug output
+    // Debug output for parameter identifiers
     std::string idListStr;
     for (const auto& id : ids) {
         if (!idListStr.empty()) idListStr += ", ";
@@ -635,13 +783,13 @@ std::any PascalToCTranslator::visitValueParameter(PascalSParser::ValueParameterC
     }
     TranslatorUtils::logDebug("Value parameter identifiers: " + idListStr);
 
-    // Get type
+    // Get type information
     auto typeResult = visit(context->type());
     
     // Initialize variables for type information
     std::string typeStr;
     PascalType pascalType;
-    PascalType elementType = PascalType::INTEGER; // Default
+    PascalType elementType = PascalType::INTEGER; // Default for arrays
     std::vector<ArrayBounds> dimensions;
     
     // Extract type information based on whether it's an array or basic type
@@ -678,7 +826,7 @@ std::any PascalToCTranslator::visitValueParameter(PascalSParser::ValueParameterC
                                              (pascalType == PascalType::BOOLEAN ? "BOOLEAN" : 
                                              (pascalType == PascalType::CHAR ? "CHAR" : "UNKNOWN"))))));
 
-        // Add to symbol table
+        // Add parameter to symbol table
         SymbolEntry entry;
         entry.name = ids[i];
         entry.symbolType = SymbolType::PARAMETER;
@@ -702,18 +850,23 @@ std::any PascalToCTranslator::visitValueParameter(PascalSParser::ValueParameterC
     return ss.str();
 }
 
+/**
+ * Processes a subprogram body which contains declarations and statements
+ * @param context The subprogram body context
+ * @return Standard placeholder for visitor pattern
+ */
 std::any PascalToCTranslator::visitSubprogramBody(PascalSParser::SubprogramBodyContext *context) {
-    // Visit const declarations
+    // Process constant declarations if present
     if (context->constDeclarations()) {
         visit(context->constDeclarations());
     }
 
-    // Visit var declarations
+    // Process variable declarations if present
     if (context->varDeclarations()) {
         visit(context->varDeclarations());
     }
 
-    // Visit compound statement
+    // Process compound statement (main body of the function/procedure)
     if (context->compoundStatement()) {
         visit(context->compoundStatement());
     }
@@ -724,25 +877,40 @@ std::any PascalToCTranslator::visitSubprogramBody(PascalSParser::SubprogramBodyC
     return std::any();
 }
 
+/**
+ * Processes a compound statement (BEGIN ... END block)
+ * @param context The compound statement context
+ * @return Standard placeholder for visitor pattern
+ */
 std::any PascalToCTranslator::visitCompoundStatement(PascalSParser::CompoundStatementContext *context) {
-    // Skip BEGIN and END, visit statement list
+    // Skip BEGIN and END tokens, just visit the statement list inside
     visit(context->statementList());
 
     return std::any();
 }
 
+/**
+ * Processes a list of statements
+ * @param context The statement list context
+ * @return Standard placeholder for visitor pattern
+ */
 std::any PascalToCTranslator::visitStatementList(PascalSParser::StatementListContext *context) {
-    // Visit additional statements first if any
+    // Visit additional statements first if any (earlier in source)
     if (context->statementList()) {
         visit(context->statementList());
     }
 
-    // Visit the current statement
+    // Visit the current statement (later in source)
     visit(context->statement());
 
     return std::any();
 }
 
+/**
+ * Processes individual statements (assignment, procedure call, if, for, etc.)
+ * @param context The statement context
+ * @return Standard placeholder for visitor pattern
+ */
 std::any PascalToCTranslator::visitStatement(PascalSParser::StatementContext *context) {
     // Empty statement
     if (!context->variable() && !context->ID() && !context->procedureCall() && !context->compoundStatement() &&
@@ -765,10 +933,11 @@ std::any PascalToCTranslator::visitStatement(PascalSParser::StatementContext *co
             // Pascal Function:=Value syntax translated to C return statement
             output << getCurrentIndentation() << "return " << expr << ";\n";
         } else {
+            // Regular assignment to an identifier
             output << getCurrentIndentation() << id << " = " << expr << ";\n";
         }
     }
-    // Assignment to variable
+    // Assignment to variable (can be array element or another complex variable)
     else if (context->variable() && context->ASSIGNOP()) {
         auto varResult = visit(context->variable());
         
@@ -809,7 +978,7 @@ std::any PascalToCTranslator::visitStatement(PascalSParser::StatementContext *co
 
         output << getCurrentIndentation() << call << ";\n";
     }
-    // Compound statement
+    // Compound statement (BEGIN ... END block)
     else if (context->compoundStatement()) {
         visit(context->compoundStatement());
     }
@@ -837,13 +1006,21 @@ std::any PascalToCTranslator::visitStatement(PascalSParser::StatementContext *co
     return std::any();
 }
 
+/**
+ * Processes an if statement and optional else part
+ * @param context The if statement context
+ * @return Standard placeholder for visitor pattern
+ */
 std::any PascalToCTranslator::visitIfStatement(PascalSParser::IfStatementContext *context) {
+    // Get the condition expression
     auto condResult = visit(context->expression());
     std::string cond = std::any_cast<std::string>(condResult);
 
+    // Output if statement with condition
     output << getCurrentIndentation() << "if (" << cond << ") {\n";
     increaseIndentation();
 
+    // Visit the if-branch statement
     visit(context->statement());
 
     decreaseIndentation();
@@ -865,8 +1042,13 @@ std::any PascalToCTranslator::visitIfStatement(PascalSParser::IfStatementContext
     return std::any();
 }
 
+/**
+ * Processes a for statement (loop with counter)
+ * @param context The for statement context
+ * @return Standard placeholder for visitor pattern
+ */
 std::any PascalToCTranslator::visitForStatement(PascalSParser::ForStatementContext *context) {
-    // Get loop variable
+    // Get loop counter variable
     std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
 
     // Get initial value
@@ -877,11 +1059,11 @@ std::any PascalToCTranslator::visitForStatement(PascalSParser::ForStatementConte
     auto finalResult = visit(context->expression(1));
     std::string final = std::any_cast<std::string>(finalResult);
 
-    // Output for loop
+    // Output C-style for loop (Pascal for-loops are always incrementing by 1)
     output << getCurrentIndentation() << "for (" << id << " = " << init << "; " << id << " <= " << final << "; ++" << id << ") {\n";
     increaseIndentation();
 
-    // Visit loop body
+    // Visit loop body statement
     visit(context->statement());
 
     decreaseIndentation();
@@ -890,9 +1072,15 @@ std::any PascalToCTranslator::visitForStatement(PascalSParser::ForStatementConte
     return std::any();
 }
 
+/**
+ * Processes a read statement (input)
+ * Translates to scanf calls in C
+ * @param context The read statement context
+ * @return Standard placeholder for visitor pattern
+ */
 std::any PascalToCTranslator::visitReadStatement(PascalSParser::ReadStatementContext *context) {
     try {
-        // Get variable list
+        // Get list of variables to read into
         auto result = visit(context->variableList());
         std::vector<std::string> vars = std::any_cast<std::vector<std::string>>(result);
 
@@ -908,12 +1096,13 @@ std::any PascalToCTranslator::visitReadStatement(PascalSParser::ReadStatementCon
                 isArrayAccess = true;
             }
             
+            // Look up the variable's type in the symbol table
             if (symbolTable->hasSymbol(baseVar)) {
                 const SymbolEntry &entry = symbolTable->getSymbol(baseVar);
                 std::string format;
 
                 if (isArrayAccess && entry.dataType == PascalType::ARRAY) {
-                    // Use the array element type for the format
+                    // Use the array element type for the format specifier
                     switch (entry.arrayElementType) {
                         case PascalType::INTEGER: format = "\"%d\""; break;
                         case PascalType::REAL: format = "\"%f\""; break;
@@ -922,7 +1111,7 @@ std::any PascalToCTranslator::visitReadStatement(PascalSParser::ReadStatementCon
                         default: format = "\"%d\""; break;
                     }
                 } else {
-                    // Use the variable's own type
+                    // Use the variable's own type for the format specifier
                     switch (entry.dataType) {
                         case PascalType::INTEGER: format = "\"%d\""; break;
                         case PascalType::REAL: format = "\"%f\""; break;
@@ -932,12 +1121,14 @@ std::any PascalToCTranslator::visitReadStatement(PascalSParser::ReadStatementCon
                     }
                 }
 
-                // For reference parameters (not local variables) that are not arrays, in the current scope, we don't need to use &
+                // For reference parameters that are not arrays, in the current scope, we don't need to use &
+                // because they are already pointers in C
                 if (entry.isReference && entry.symbolType == SymbolType::PARAMETER && 
                     !isArrayAccess && entry.dataType != PascalType::ARRAY && 
                     symbolTable->hasSymbolInCurrentScope(baseVar)) {
                     output << getCurrentIndentation() << "scanf(" << format << ", " << var << ");\n";
                 } else {
+                    // Regular variables need & to get their address for scanf
                     output << getCurrentIndentation() << "scanf(" << format << ", &" << var << ");\n";
                 }
             } else {
@@ -952,16 +1143,21 @@ std::any PascalToCTranslator::visitReadStatement(PascalSParser::ReadStatementCon
     return std::any();
 }
 
+/**
+ * Processes a while statement (loop with condition)
+ * @param context The while statement context
+ * @return Standard placeholder for visitor pattern
+ */
 std::any PascalToCTranslator::visitWhileStatement(PascalSParser::WhileStatementContext *context) {
-    // Get condition
+    // Get the loop condition
     auto condResult = visit(context->expression());
     std::string cond = std::any_cast<std::string>(condResult);
 
-    // Output while loop
+    // Output while loop with condition
     output << getCurrentIndentation() << "while (" << cond << ") {\n";
     increaseIndentation();
 
-    // Visit loop body
+    // Visit loop body statement
     visit(context->statement());
 
     decreaseIndentation();
@@ -970,13 +1166,19 @@ std::any PascalToCTranslator::visitWhileStatement(PascalSParser::WhileStatementC
     return std::any();
 }
 
+/**
+ * Processes a write statement (output)
+ * Translates to printf calls in C
+ * @param context The write statement context
+ * @return Standard placeholder for visitor pattern
+ */
 std::any PascalToCTranslator::visitWriteStatement(PascalSParser::WriteStatementContext *context) {
     auto result = visit(context->expressionList());
     std::vector<std::string> exprs = std::any_cast<std::vector<std::string>>(result);
 
     output << getCurrentIndentation() << "printf(";
 
-    // Format string
+    // Format string part of printf
     std::string formatStr = "\"";
     std::vector<std::string> formattedArgs;
     
@@ -989,11 +1191,13 @@ std::any PascalToCTranslator::visitWriteStatement(PascalSParser::WriteStatementC
         // Check if it's a string literal
         if (expr.size() >= 2 && expr[0] == '\'' && expr.back() == '\'') {
             formatSpecifier = "%s";
-            // Remove the single quotes from the expression
+            // Remove the single quotes from the expression and add double quotes for C string
             formattedArg = "\"" + expr.substr(1, expr.size() - 2) + "\"";
         } else if (expr.find('.') != std::string::npos) {
+            // Floating point values use %f
             formatSpecifier = "%f";
         } else if (expr == "0" || expr == "1" || expr == "true" || expr == "false") {
+            // Boolean values use %d (0/1 in C)
             formatSpecifier = "%d";
         } else {
             // Try to look up the type in the symbol table
@@ -1012,6 +1216,7 @@ std::any PascalToCTranslator::visitWriteStatement(PascalSParser::WriteStatementC
                 baseVar = baseVar.substr(0, parenPos);
             }
             
+            // Look up variable type in symbol table
             if (symbolTable->hasSymbol(baseVar)) {
                 const SymbolEntry &entry = symbolTable->getSymbol(baseVar);
                 
@@ -1057,6 +1262,11 @@ std::any PascalToCTranslator::visitWriteStatement(PascalSParser::WriteStatementC
     return std::any();
 }
 
+/**
+ * Processes a list of variables for input/output or other operations
+ * @param context The variable list context
+ * @return Vector of string representations of variables in C syntax
+ */
 std::any PascalToCTranslator::visitVariableList(PascalSParser::VariableListContext *context) {
     std::vector<std::string> vars;
 
@@ -1085,10 +1295,16 @@ std::any PascalToCTranslator::visitVariableList(PascalSParser::VariableListConte
     return vars;
 }
 
+/**
+ * Processes a variable identifier, which could be a simple variable or array element
+ * Handles special cases like function result variables and reference parameters
+ * @param context The variable context
+ * @return String representation of the variable in C syntax or a special marker for function results
+ */
 std::any PascalToCTranslator::visitVariable(PascalSParser::VariableContext *context) {
     std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
 
-    // Check if the variable is a function name in the current scope or any parent function scope
+    // Check if the variable is a function name in the current scope
     // If so, we need to return special information to handle function results
     std::string currentScopeName = symbolTable->getCurrentScope().getScopeName();
     
@@ -1136,17 +1352,22 @@ std::any PascalToCTranslator::visitVariable(PascalSParser::VariableContext *cont
     return result;
 }
 
+/**
+ * Processes array indexing expressions for a variable
+ * @param context The ID variable part context (array indexing)
+ * @return String representation of the array indices in C syntax
+ */
 std::any PascalToCTranslator::visitIdVarPart(PascalSParser::IdVarPartContext *context) {
     // Empty array access
     if (!context->expressionList()) {
         return std::string("");
     }
 
-    // Get array indices
+    // Get array indices from expression list
     auto result = visit(context->expressionList());
     std::vector<std::string> indices = std::any_cast<std::vector<std::string>>(result);
 
-    // Format array access
+    // Format array access with C-style indexing
     std::stringstream ss;
     for (const auto &index : indices) {
         ss << "[" << index << "]";
@@ -1155,6 +1376,11 @@ std::any PascalToCTranslator::visitIdVarPart(PascalSParser::IdVarPartContext *co
     return ss.str();
 }
 
+/**
+ * Processes a procedure call statement
+ * @param context The procedure call context
+ * @return String representation of the procedure call in C syntax
+ */
 std::any PascalToCTranslator::visitProcedureCall(PascalSParser::ProcedureCallContext *context) {
     std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
 
@@ -1254,6 +1480,11 @@ std::any PascalToCTranslator::visitProcedureCall(PascalSParser::ProcedureCallCon
     return id + "()";
 }
 
+/**
+ * Processes the else part of an if statement
+ * @param context The else part context
+ * @return String representation of "else" (for consistency in visitor pattern)
+ */
 std::any PascalToCTranslator::visitElsePart(PascalSParser::ElsePartContext *context) {
     // Empty else part
     if (!context->statement()) {
@@ -1266,6 +1497,11 @@ std::any PascalToCTranslator::visitElsePart(PascalSParser::ElsePartContext *cont
     return std::string("else");
 }
 
+/**
+ * Processes a list of expressions for function/procedure arguments or array indices
+ * @param context The expression list context
+ * @return Vector of string representations of expressions in C syntax
+ */
 std::any PascalToCTranslator::visitExpressionList(PascalSParser::ExpressionListContext *context) {
     std::vector<std::string> exprs;
 
@@ -1290,13 +1526,18 @@ std::any PascalToCTranslator::visitExpressionList(PascalSParser::ExpressionListC
     return exprs;
 }
 
+/**
+ * Processes an expression which can be a simple expression or a relational expression
+ * @param context The expression context
+ * @return String representation of the expression in C syntax
+ */
 std::any PascalToCTranslator::visitExpression(PascalSParser::ExpressionContext *context) {
-    // Simple expression
+    // Simple expression (no relational operator)
     if (!context->relop()) {
         return visit(context->simpleExpression(0));
     }
 
-    // Relational expression
+    // Relational expression (with comparison operator)
     auto leftResult = visit(context->simpleExpression(0));
     std::string left = std::any_cast<std::string>(leftResult);
 
@@ -1306,16 +1547,22 @@ std::any PascalToCTranslator::visitExpression(PascalSParser::ExpressionContext *
     auto rightResult = visit(context->simpleExpression(1));
     std::string right = std::any_cast<std::string>(rightResult);
 
+    // Parenthesize the comparison for safety
     return std::string("(") + left + " " + op + " " + right + ")";
 }
 
+/**
+ * Processes a simple expression which can be a term or additive expressions
+ * @param context The simple expression context
+ * @return String representation of the simple expression in C syntax
+ */
 std::any PascalToCTranslator::visitSimpleExpression(PascalSParser::SimpleExpressionContext *context) {
-    // Single term
+    // Single term (no additive operator)
     if (!context->addop()) {
         return visit(context->term());
     }
 
-    // Expression with additive operator
+    // Expression with additive operator (+ - OR)
     auto leftResult = visit(context->simpleExpression());
     std::string left = std::any_cast<std::string>(leftResult);
 
@@ -1325,16 +1572,22 @@ std::any PascalToCTranslator::visitSimpleExpression(PascalSParser::SimpleExpress
     auto rightResult = visit(context->term());
     std::string right = std::any_cast<std::string>(rightResult);
 
+    // Parenthesize the expression for correct precedence
     return std::string("(") + left + " " + op + " " + right + ")";
 }
 
+/**
+ * Processes a term which can be a factor or multiplicative expressions
+ * @param context The term context
+ * @return String representation of the term in C syntax
+ */
 std::any PascalToCTranslator::visitTerm(PascalSParser::TermContext *context) {
-    // Single factor
+    // Single factor (no multiplicative operator)
     if (!context->mulop()) {
         return visit(context->factor());
     }
 
-    // Term with multiplicative operator
+    // Term with multiplicative operator (* / DIV MOD AND)
     auto leftResult = visit(context->term());
     std::string left = std::any_cast<std::string>(leftResult);
 
@@ -1344,15 +1597,21 @@ std::any PascalToCTranslator::visitTerm(PascalSParser::TermContext *context) {
     auto rightResult = visit(context->factor());
     std::string right = std::any_cast<std::string>(rightResult);
 
+    // Parenthesize the expression for correct precedence
     return std::string("(") + left + " " + op + " " + right + ")";
 }
 
+/**
+ * Processes a factor, which can be a constant, variable, expression, function call, or unary operation
+ * @param context The factor context
+ * @return String representation of the factor in C syntax
+ */
 std::any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *context) {
-    // Number
+    // Number literal
     if (context->num()) {
         return visit(context->num());
     }
-    // Variable
+    // Variable (can be simple variable or array element)
     else if (context->variable()) {
         return visit(context->variable());
     }
@@ -1456,14 +1715,14 @@ std::any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *context)
 
         return ss.str();
     }
-    // Negation
+    // Logical NOT operation
     else if (context->NOT()) {
         auto result = visit(context->factor());
         std::string factor = std::any_cast<std::string>(result);
 
         return std::string("!(") + factor + ")";
     }
-    // Unary minus
+    // Unary minus operation
     else if (context->MINUS()) {
         auto result = visit(context->factor());
         std::string factor = std::any_cast<std::string>(result);
@@ -1482,51 +1741,71 @@ std::any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *context)
     return std::string("");
 }
 
+/**
+ * Processes a numeric literal
+ * @param context The num context
+ * @return String representation of the number
+ */
 std::any PascalToCTranslator::visitNum(PascalSParser::NumContext *context) {
     return context->NUM()->getText();
 }
 
+/**
+ * Processes a relational operator (==, !=, <, <=, >, >=)
+ * @param context The relop context
+ * @return String representation of the operator in C syntax
+ */
 std::any PascalToCTranslator::visitRelop(PascalSParser::RelopContext *context) {
     if (context->EQUAL()) {
-        return std::string("==");
+        return std::string("==");  // Pascal = becomes == in C
     } else if (context->NOTEQUAL()) {
-        return std::string("!=");
+        return std::string("!=");  // Pascal <> becomes != in C
     } else if (context->LT()) {
-        return std::string("<");
+        return std::string("<");   // Pascal < same in C
     } else if (context->LE()) {
-        return std::string("<=");
+        return std::string("<=");  // Pascal <= same in C
     } else if (context->GT()) {
-        return std::string(">");
+        return std::string(">");   // Pascal > same in C
     } else if (context->GE()) {
-        return std::string(">=");
+        return std::string(">=");  // Pascal >= same in C
     }
 
     return std::string("");
 }
 
+/**
+ * Processes an additive operator (+, -, OR)
+ * @param context The addop context
+ * @return String representation of the operator in C syntax
+ */
 std::any PascalToCTranslator::visitAddop(PascalSParser::AddopContext *context) {
     if (context->PLUS()) {
-        return std::string("+");
+        return std::string("+");   // Pascal + same in C
     } else if (context->MINUS()) {
-        return std::string("-");
+        return std::string("-");   // Pascal - same in C
     } else if (context->OR()) {
-        return std::string("||");
+        return std::string("||");  // Pascal OR becomes || in C
     }
 
     return std::string("");
 }
 
+/**
+ * Processes a multiplicative operator (*, /, DIV, MOD, AND)
+ * @param context The mulop context
+ * @return String representation of the operator in C syntax
+ */
 std::any PascalToCTranslator::visitMulop(PascalSParser::MulopContext *context) {
     if (context->STAR()) {
-        return std::string("*");
+        return std::string("*");   // Pascal * same in C
     } else if (context->SLASH()) {
-        return std::string("/");
+        return std::string("/");   // Pascal / same in C (float division)
     } else if (context->DIV()) {
-        return std::string("/");  // Integer division in C
+        return std::string("/");   // Pascal DIV becomes / in C (integer division)
     } else if (context->MOD()) {
-        return std::string("%");
+        return std::string("%");   // Pascal MOD becomes % in C
     } else if (context->AND()) {
-        return std::string("&&");
+        return std::string("&&");  // Pascal AND becomes && in C
     }
 
     return std::string("");
