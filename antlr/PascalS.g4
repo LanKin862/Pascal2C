@@ -287,7 +287,7 @@ ASSIGNOP  : ':=' ;
 DOTDOT    : '..' ;
 
 // Define ID and NUM
-ID  : [a-zA-Z][a-zA-Z0-9]* ;
+ID  : [a-zA-Z_][a-zA-Z0-9_]* ;
 NUM : [0-9]+ ('.' [0-9]+)? ;
 LETTER : '\'' [a-zA-Z] '\'' ;
 STRING : '\'' (~['\r\n] | '\'\'')* '\'' ;
