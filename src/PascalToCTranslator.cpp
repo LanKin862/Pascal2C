@@ -216,7 +216,11 @@ std::any PascalToCTranslator::visitProgramBody(PascalSParser::ProgramBodyContext
 void PascalToCTranslator::generateForwardDeclarations(PascalSParser::SubprogramDeclarationsContext *context) {
     if (!context) return;
 
-    // Process the current subprogram first (earlier in source)
+    // Then process any nested declarations first (earlier in source)
+    if (context->subprogramDeclarations()) {
+        generateForwardDeclarations(context->subprogramDeclarations());
+    }
+    // Process the current subprogram (later in source)
     if (context->subprogram()) {
         PascalSParser::SubprogramHeadContext* headContext = context->subprogram()->subprogramHead();
         if (headContext) {
@@ -244,13 +248,10 @@ void PascalToCTranslator::generateForwardDeclarations(PascalSParser::SubprogramD
 
             // Output forward declaration
             output << returnType << " " << name << params << ";\n";
+            std:: cout << "Forward declaration for " << name << " generated\n";
         }
     }
 
-    // Then process any nested declarations (later in source)
-    if (context->subprogramDeclarations()) {
-        generateForwardDeclarations(context->subprogramDeclarations());
-    }
 }
 
 /**
@@ -585,16 +586,15 @@ std::any PascalToCTranslator::visitSubprogramDeclarations(PascalSParser::Subprog
         return std::any();
     }
 
-    // First process the current subprogram, which comes earlier in the source
-    if (context->subprogram()) {
-        visit(context->subprogram());
-    }
-
-    // Then process additional subprogram declarations that come later in the source
+    // First process the current subprogram declarations, which comes earlier in the source
     if (context->subprogramDeclarations()) {
         visit(context->subprogramDeclarations());
     }
 
+    // Then process additional subprogram that come later in the source
+    if (context->subprogram()) {
+        visit(context->subprogram());
+    }
     return std::any();
 }
 

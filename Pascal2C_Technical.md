@@ -4,6 +4,46 @@
 
 ## 1. 核心文件及功能
 
+### **转换规则说明：**
+
+**Pascal-S** **到** **C** **的主要转换规则**
+
+1. **程序结构:**
+
+2. - Pascal-S 的 program 声明映射到 C 的 main 函数及其包含头文件
+   - Pascal-S 的程序参数列表转换为 C 的命令行参数
+
+3. **数据类型:** 
+
+4. - integer -> int
+   - real -> float
+   - boolean -> int (0表示false, 非0表示true)
+   - char -> char
+   - array[m..n] of T -> T array[n-m+1] 并调整索引方式
+
+5. **控制结构:** 
+
+6. - if-then-else -> if () {} else {}
+   - for 循环 -> for 循环 (注意索引处理)
+   - while 循环 -> while 循环
+
+7. **过程和函数:** 
+
+8. - Pascal-S 过程 -> C 函数 (返回类型为 void)
+   - Pascal-S 函数 -> C 函数 (带返回类型)
+   - VAR 参数 -> 指针参数
+
+9. **输入输出:** 
+
+10. - read -> scanf
+    - write -> printf
+
+11. **特殊处理:** 
+
+12. - Pascal-S 的作用域规则与 C 不同，需要特别处理嵌套子程序
+    - C 不支持嵌套函数定义，需要将嵌套函数提升到全局作用域并传递上下文
+    - Pascal-S 的布尔表达式需要转换为 C 的整数表达式
+
 ### 1.1 PascalToCTranslator 类 (主要转换器)
 
 **文件**: `include/PascalToCTranslator.h`, `src/PascalToCTranslator.cpp`
