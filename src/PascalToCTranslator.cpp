@@ -1954,8 +1954,32 @@ std::any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *context)
         }
 
         ss << ")";
+        std::cout << "function call :" << ss.str() << std::endl;
 
         return ss.str();
+    }
+    // Function call without parentheses (for Pascal functions with no parameters)
+    else if (context->ID() && !context->expressionList()) {
+        std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
+
+        // Check if this ID is a function in the symbol table
+        if (symbolTable->hasSymbol(id)) {
+            const SymbolEntry& entry = symbolTable->getSymbol(id);
+
+            // If it's a function and it has a scope (meaning it's a function declaration, not a variable)
+            if (entry.symbolType == SymbolType::FUNCTION && symbolTable->hasScope(id)) {
+                const ScopeEntry& scope = symbolTable->getScope(id);
+                // Check if the function has no parameters
+                if (scope.getParameters().empty()) {
+                    // This is a parameter-less function call without parentheses
+                    // In C, we need to add the parentheses
+                    return id + "()";
+                }
+            }
+        }
+
+        // If not recognized as a function with no parameters, treat as a regular variable
+        return id;
     }
     // Logical NOT operation
     else if (context->NOT()) {

@@ -199,9 +199,9 @@ term
 
 factor
     : num
+    | ID (LPAREN expressionList RPAREN)?
     | variable
     | LPAREN expression RPAREN
-    | ID LPAREN expressionList RPAREN
     | NOT factor
     | MINUS factor
     | STRING

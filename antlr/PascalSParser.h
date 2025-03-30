@@ -725,12 +725,12 @@ public:
     FactorContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     NumContext *num();
-    VariableContext *variable();
-    antlr4::tree::TerminalNode *LPAREN();
-    ExpressionContext *expression();
-    antlr4::tree::TerminalNode *RPAREN();
     antlr4::tree::TerminalNode *ID();
+    antlr4::tree::TerminalNode *LPAREN();
     ExpressionListContext *expressionList();
+    antlr4::tree::TerminalNode *RPAREN();
+    VariableContext *variable();
+    ExpressionContext *expression();
     antlr4::tree::TerminalNode *NOT();
     FactorContext *factor();
     antlr4::tree::TerminalNode *MINUS();
