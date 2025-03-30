@@ -365,8 +365,8 @@ public:
     FormalParameterContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *LPAREN();
-    ParameterListContext *parameterList();
     antlr4::tree::TerminalNode *RPAREN();
+    ParameterListContext *parameterList();
 
 
     virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
@@ -636,8 +636,8 @@ public:
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *ID();
     antlr4::tree::TerminalNode *LPAREN();
-    ExpressionListContext *expressionList();
     antlr4::tree::TerminalNode *RPAREN();
+    ExpressionListContext *expressionList();
 
 
     virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
@@ -727,8 +727,8 @@ public:
     NumContext *num();
     antlr4::tree::TerminalNode *ID();
     antlr4::tree::TerminalNode *LPAREN();
-    ExpressionListContext *expressionList();
     antlr4::tree::TerminalNode *RPAREN();
+    ExpressionListContext *expressionList();
     VariableContext *variable();
     ExpressionContext *expression();
     antlr4::tree::TerminalNode *NOT();

@@ -84,7 +84,7 @@ subprogramHead
 
 formalParameter
     : /* empty */
-    | LPAREN parameterList RPAREN
+    | LPAREN (parameterList)? RPAREN
     ;
 
 parameterList
@@ -169,7 +169,7 @@ idVarPart
 
 procedureCall
     : ID
-    | ID LPAREN expressionList RPAREN
+    | ID LPAREN (expressionList)? RPAREN
     ;
 
 elsePart
@@ -199,7 +199,7 @@ term
 
 factor
     : num
-    | ID (LPAREN expressionList RPAREN)?
+    | ID (LPAREN (expressionList)? RPAREN)?
     | variable
     | LPAREN expression RPAREN
     | NOT factor
