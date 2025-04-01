@@ -294,6 +294,7 @@ STRING : '\'' (~['\r\n] | '\'\'')* '\'' ;
 
 // Skip whitespace and handle comments
 COMMENT : '{' .*? '}' -> skip ;
+LINE_COMMENT : '//' .*? '\n' -> skip;
 WS      : [ \t\r\n]+ -> skip ;
 
 // Fragment rules for case insensitivity

@@ -20,7 +20,7 @@ public:
     LT = 34, LE = 35, GT = 36, GE = 37, PLUS = 38, MINUS = 39, STAR = 40, 
     SLASH = 41, LPAREN = 42, RPAREN = 43, LBRACKET = 44, RBRACKET = 45, 
     ASSIGNOP = 46, DOTDOT = 47, ID = 48, NUM = 49, LETTER = 50, STRING = 51, 
-    COMMENT = 52, WS = 53
+    COMMENT = 52, LINE_COMMENT = 53, WS = 54
   };
 
   enum {
