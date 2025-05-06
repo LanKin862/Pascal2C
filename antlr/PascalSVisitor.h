@@ -79,6 +79,8 @@ public:
 
     virtual antlrcpp::Any visitWriteStatement(PascalSParser::WriteStatementContext *context) = 0;
 
+    virtual antlrcpp::Any visitBreakStatement(PascalSParser::BreakStatementContext *context) = 0;
+
     virtual antlrcpp::Any visitVariableList(PascalSParser::VariableListContext *context) = 0;
 
     virtual antlrcpp::Any visitVariable(PascalSParser::VariableContext *context) = 0;

@@ -36,7 +36,7 @@ constDeclaration
 
 constValue
     : PLUS? num
-    | MINUS num
+    | MINUS? num
     | LETTER
     | STRING
     ;
@@ -129,6 +129,7 @@ statement
     | ifStatement
     | forStatement
     | readStatement
+    | breakStatement
     | whileStatement
     | writeStatement
     ;
@@ -151,6 +152,10 @@ whileStatement
 
 writeStatement
     : WRITE LPAREN expressionList RPAREN
+    ;
+
+breakStatement
+    : BREAK
     ;
 
 variableList
@@ -204,6 +209,7 @@ factor
     | LPAREN expression RPAREN
     | NOT factor
     | MINUS factor
+    | PLUS factor
     | STRING
     | LETTER
     ;
@@ -264,6 +270,8 @@ AND     : A N D ;
 OR      : O R ;
 NOT     : N O T ;
 WHILE   : W H I L E ;
+BREAK   : B R E A K ;
+LETTER : T R U E | F A L S E;
 
 SEMICOLON : ';' ;
 COLON     : ':' ;
@@ -289,7 +297,6 @@ DOTDOT    : '..' ;
 // Define ID and NUM
 ID  : [a-zA-Z_][a-zA-Z0-9_]* ;
 NUM : [0-9]+ ('.' [0-9]+)? ;
-LETTER : '\'' [a-zA-Z] '\'' ;
 STRING : '\'' (~['\r\n] | '\'\'')* '\'' ;
 
 // Skip whitespace and handle comments

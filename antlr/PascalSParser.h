@@ -16,11 +16,11 @@ public:
     END = 7, ARRAY = 8, OF = 9, IF = 10, THEN = 11, ELSE = 12, FOR = 13, 
     TO = 14, DO = 15, READ = 16, WRITE = 17, INTEGER = 18, REAL = 19, BOOLEAN = 20, 
     CHAR = 21, DIV = 22, MOD = 23, AND = 24, OR = 25, NOT = 26, WHILE = 27, 
-    SEMICOLON = 28, COLON = 29, DOT = 30, COMMA = 31, EQUAL = 32, NOTEQUAL = 33, 
-    LT = 34, LE = 35, GT = 36, GE = 37, PLUS = 38, MINUS = 39, STAR = 40, 
-    SLASH = 41, LPAREN = 42, RPAREN = 43, LBRACKET = 44, RBRACKET = 45, 
-    ASSIGNOP = 46, DOTDOT = 47, ID = 48, NUM = 49, LETTER = 50, STRING = 51, 
-    COMMENT = 52, LINE_COMMENT = 53, WS = 54
+    BREAK = 28, LETTER = 29, SEMICOLON = 30, COLON = 31, DOT = 32, COMMA = 33, 
+    EQUAL = 34, NOTEQUAL = 35, LT = 36, LE = 37, GT = 38, GE = 39, PLUS = 40, 
+    MINUS = 41, STAR = 42, SLASH = 43, LPAREN = 44, RPAREN = 45, LBRACKET = 46, 
+    RBRACKET = 47, ASSIGNOP = 48, DOTDOT = 49, ID = 50, NUM = 51, STRING = 52, 
+    COMMENT = 53, LINE_COMMENT = 54, WS = 55
   };
 
   enum {
@@ -32,11 +32,11 @@ public:
     RuleParameterList = 17, RuleParameter = 18, RuleVarParameter = 19, RuleValueParameter = 20, 
     RuleSubprogramBody = 21, RuleCompoundStatement = 22, RuleStatementList = 23, 
     RuleStatement = 24, RuleIfStatement = 25, RuleForStatement = 26, RuleReadStatement = 27, 
-    RuleWhileStatement = 28, RuleWriteStatement = 29, RuleVariableList = 30, 
-    RuleVariable = 31, RuleIdVarPart = 32, RuleProcedureCall = 33, RuleElsePart = 34, 
-    RuleExpressionList = 35, RuleExpression = 36, RuleSimpleExpression = 37, 
-    RuleTerm = 38, RuleFactor = 39, RuleNum = 40, RuleRelop = 41, RuleAddop = 42, 
-    RuleMulop = 43
+    RuleWhileStatement = 28, RuleWriteStatement = 29, RuleBreakStatement = 30, 
+    RuleVariableList = 31, RuleVariable = 32, RuleIdVarPart = 33, RuleProcedureCall = 34, 
+    RuleElsePart = 35, RuleExpressionList = 36, RuleExpression = 37, RuleSimpleExpression = 38, 
+    RuleTerm = 39, RuleFactor = 40, RuleNum = 41, RuleRelop = 42, RuleAddop = 43, 
+    RuleMulop = 44
   };
 
   PascalSParser(antlr4::TokenStream *input);
@@ -79,6 +79,7 @@ public:
   class ReadStatementContext;
   class WhileStatementContext;
   class WriteStatementContext;
+  class BreakStatementContext;
   class VariableListContext;
   class VariableContext;
   class IdVarPartContext;
@@ -460,6 +461,7 @@ public:
     IfStatementContext *ifStatement();
     ForStatementContext *forStatement();
     ReadStatementContext *readStatement();
+    BreakStatementContext *breakStatement();
     WhileStatementContext *whileStatement();
     WriteStatementContext *writeStatement();
 
@@ -548,6 +550,18 @@ public:
   };
 
   WriteStatementContext* writeStatement();
+
+  class  BreakStatementContext : public antlr4::ParserRuleContext {
+  public:
+    BreakStatementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *BREAK();
+
+    virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+   
+  };
+
+  BreakStatementContext* breakStatement();
 
   class  VariableListContext : public antlr4::ParserRuleContext {
   public:
@@ -688,6 +702,7 @@ public:
     antlr4::tree::TerminalNode *NOT();
     FactorContext *factor();
     antlr4::tree::TerminalNode *MINUS();
+    antlr4::tree::TerminalNode *PLUS();
     antlr4::tree::TerminalNode *STRING();
     antlr4::tree::TerminalNode *LETTER();
 

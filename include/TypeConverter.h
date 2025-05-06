@@ -9,7 +9,7 @@ class TypeConverter {
   private:
     std::unordered_map<PascalType, std::string> typeMap;
 
-  public:
+public:
     TypeConverter();
 
     // Convert a Pascal-S type to a C type

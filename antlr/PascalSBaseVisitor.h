@@ -135,6 +135,10 @@ public:
     return visitChildren(ctx);
   }
 
+  virtual antlrcpp::Any visitBreakStatement(PascalSParser::BreakStatementContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
   virtual antlrcpp::Any visitVariableList(PascalSParser::VariableListContext *ctx) override {
     return visitChildren(ctx);
   }

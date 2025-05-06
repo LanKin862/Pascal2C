@@ -107,17 +107,6 @@ antlrcpp::Any PascalToCTranslator::visitProgram(PascalSParser::ProgramContext *c
     output << "// Pascal-specific functions and types\n";
     output << "typedef int boolean;\n";
     output << "typedef char *string;\n\n";
-    output << "// Helper function for read/readln\n";
-    output << "void read_value(const char* format, void* value) {\n";
-    output << "    scanf(format, value);\n";
-    output << "}\n\n";
-    output << "// Helper function for write/writeln\n";
-    output << "void write_value(const char* format, ...) {\n";
-    output << "    va_list args;\n";
-    output << "    va_start(args, format);\n";
-    output << "    vprintf(format, args);\n";
-    output << "    va_end(args);\n";
-    output << "}\n\n";
 
     // Visit the program structure node
     return visit(context->programStruct());
@@ -241,18 +230,13 @@ void PascalToCTranslator::generateForwardDeclarations(PascalSParser::SubprogramD
             if (headContext->formalParameter()) {
                 auto paramsResult = visit(headContext->formalParameter());
                 params = paramsResult.as<std::string>();
-
-                // Clean up array brackets in parameters for forward declarations
-//                std::regex pattern(R"((\[)\d+(\]))");
-//                params = std::regex_replace(params, pattern, "$1$2");
             }
 
             // Output forward declaration
             output << returnType << " " << name << params << ";\n";
-            std:: cout << "Forward declaration for " << name << " generated\n";
+            std::cout << "Forward declaration for " << name << " generated\n";
         }
     }
-
 }
 
 /**
@@ -299,14 +283,10 @@ antlrcpp::Any PascalToCTranslator::visitConstDeclarations(PascalSParser::ConstDe
  * @return Standard placeholder for visitor pattern
  */
 antlrcpp::Any PascalToCTranslator::visitConstDeclaration(PascalSParser::ConstDeclarationContext *context) {
-    // Get constant name and convert to C identifier
     std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
 
     // Get constant value
     std::string value = visit(context->constValue()).as<std::string>();
-
-    // Output as a C preprocessor define
-    output << "#define " << id << " " << value << "\n";
 
     // Add constant to symbol table
     SymbolEntry entry;
@@ -317,15 +297,20 @@ antlrcpp::Any PascalToCTranslator::visitConstDeclaration(PascalSParser::ConstDec
     // Try to infer the type from the value's format
     if (value.find('.') != std::string::npos) {
         entry.dataType = PascalType::REAL;
-    } else if (value == "0" || value == "1") {
-        entry.dataType = PascalType::BOOLEAN;
+    } else if (TranslatorUtils::toCIdentifier(value) == "true" || TranslatorUtils::toCIdentifier(value) == "false") {
+        entry.dataType = PascalType::INTEGER;
+        entry.value = TranslatorUtils::toCIdentifier(value) == "true" ? "1" : "0";
     } else if (value.length() >= 2 && value[0] == '\'' && value.back() == '\'') {
-        entry.dataType = PascalType::CHAR;
+        entry.dataType = PascalType::STRING;
+        entry.value[0] = entry.value.back() = '\"';
     } else {
         entry.dataType = PascalType::INTEGER;
     }
 
     symbolTable->addSymbol(entry);
+
+    // Output as a C preprocessor define
+    output << "#define " << entry.name << " " << entry.value << "\n";
 
     // Process additional constant declarations if any (recursively)
     if (context->constDeclaration()) {
@@ -416,23 +401,6 @@ antlrcpp::Any PascalToCTranslator::visitVarDeclaration(PascalSParser::VarDeclara
             elementType = std::get<2>(arrayTypeInfo);
             dimensions = std::get<3>(arrayTypeInfo);
 
-            // Because Pascal arrays are 1-indexed, we need to adjust the bounds to be 0-indexed
-            std::string tmpTypeStr = "";
-            for (int i = 0; i < typeStr.size(); i++) {
-                if(typeStr[i] == '['){
-                    tmpTypeStr += typeStr[i];
-                    int j = i + 1;
-                    std::string boundStr = "";
-                    while (typeStr[j] != ']' && j < typeStr.size()){
-                        boundStr += typeStr[j];
-                        j++;
-                    }
-                    tmpTypeStr += std::to_string(std::stoi(boundStr) + 5);
-                    i = j - 1;
-                }
-                else tmpTypeStr += typeStr[i];
-            }
-            typeStr = tmpTypeStr;
             for (auto &bounds : dimensions) {
                 bounds.lowerBound--;
             }
@@ -622,8 +590,49 @@ antlrcpp::Any PascalToCTranslator::visitSubprogram(PascalSParser::SubprogramCont
     output << " {\n";
     increaseIndentation();
 
+    // For functions, add a return value variable with the same name as the function
+    if (context->subprogramHead()->FUNCTION()) {
+        std::string funcName = TranslatorUtils::toCIdentifier(context->subprogramHead()->ID()->getText());
+        std::string funcNameTmp = funcName + "tmp";
+        auto typeResult = visit(context->subprogramHead()->basicType());
+        PascalType returnType = typeResult.as<PascalType>();
+        std::string cType = typeConverter->convertType(returnType);
+        
+        // Initialize the return value variable based on type
+        output << getCurrentIndentation() << cType << " " << funcNameTmp << " = ";
+        if (returnType == PascalType::INTEGER) {
+            output << "0";
+        } else if (returnType == PascalType::REAL) {
+            output << "0.0";
+        } else if (returnType == PascalType::BOOLEAN) {
+            output << "0";
+        } else if (returnType == PascalType::CHAR) {
+            output << "'\\0'";
+        } else if (returnType == PascalType::STRING) {
+            output << "\"\"";
+        } else if (returnType == PascalType::ARRAY) {
+            // Arrays are initialized to zero by default in C
+            output << "{0}";
+        }
+        output << ";\n";
+        
+        // Also store the temporary variable name in the symbol table so we can reference it correctly
+        SymbolEntry tmpEntry;
+        tmpEntry.name = funcNameTmp;
+        tmpEntry.symbolType = SymbolType::VARIABLE;
+        tmpEntry.dataType = returnType;
+        symbolTable->addSymbol(tmpEntry);
+    }
+
     // Visit subprogram body to generate function implementation
     visit(context->subprogramBody());
+
+    // For functions, add a return statement at the end if there isn't one
+    if (context->subprogramHead()->FUNCTION()) {
+        std::string funcName = TranslatorUtils::toCIdentifier(context->subprogramHead()->ID()->getText());
+        std::string funcNameTmp = funcName + "tmp";
+        output << getCurrentIndentation() << "return " << funcNameTmp << ";\n";
+    }
 
     // Add closing brace and extra newline
     decreaseIndentation();
@@ -1087,23 +1096,29 @@ antlrcpp::Any PascalToCTranslator::visitStatement(PascalSParser::StatementContex
     // Empty statement
     if (!context->variable() && !context->ID() && !context->procedureCall() && !context->compoundStatement() &&
         !context->ifStatement() && !context->forStatement() && !context->readStatement() &&
-        !context->whileStatement() && !context->writeStatement()) {
+        !context->whileStatement() && !context->writeStatement() && !context->breakStatement()) {
         return antlrcpp::Any();
     }
 
     // Assignment to identifier (procedure or function result)
     if (context->ID() && context->ASSIGNOP()) {
         std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
+        if(!symbolTable->hasSymbol(id)){
+            std::cout << "----------------------------------------------------------" << std::endl;
+            std::cout << "Error: Undefined variable " << id << " in " << symbolTable->getCurrentScope().getScopeName() << ", line :" << context->start->getLine() << std::endl;
+            std::cout << "----------------------------------------------------------" << std::endl;
+        }
 
         auto exprResult = visit(context->expression());
         std::string expr = exprResult.as<std::string>();
 
-        // Get current scope name - if we're assigning to a function with the same name, it's a return
+        // Get current scope name - if we're assigning to a function with the same name, it's a return value assignment
         std::string currentScopeName = symbolTable->getCurrentScope().getScopeName();
 
         if (currentScopeName == id) {
-            // Pascal Function:=Value syntax translated to C return statement
-            output << getCurrentIndentation() << "return " << expr << ";\n";
+            // This is a function result assignment (Pascal function:=value)
+            // Assign to the function's tmp variable instead of the function name directly
+            output << getCurrentIndentation() << id << "tmp = " << expr << ";\n";
         } else {
             // Regular assignment to an identifier
             output << getCurrentIndentation() << id << " = " << expr << ";\n";
@@ -1121,8 +1136,9 @@ antlrcpp::Any PascalToCTranslator::visitStatement(PascalSParser::StatementContex
                     // This is a function result assignment (Pascal function:=value)
                     auto exprResult = visit(context->expression());
                     std::string expr = exprResult.as<std::string>();
-
-                    output << getCurrentIndentation() << "return " << expr << ";\n";
+                    
+                    // Assign to the function's tmp variable instead of returning directly
+                    output << getCurrentIndentation() << pair.second << "tmp = " << expr << ";\n";
                     return antlrcpp::Any();
                 }
             }
@@ -1173,6 +1189,10 @@ antlrcpp::Any PascalToCTranslator::visitStatement(PascalSParser::StatementContex
     // Write statement
     else if (context->writeStatement()) {
         visit(context->writeStatement());
+    }
+    // Break statement
+    else if (context->breakStatement()) {
+        visit(context->breakStatement());
     }
 
     return antlrcpp::Any();
@@ -1360,38 +1380,38 @@ antlrcpp::Any PascalToCTranslator::visitWriteStatement(PascalSParser::WriteState
         std::string formatSpecifier;
         std::string formattedArg = expr;
 
+        // Check if it's an array access (contains square brackets)
+        std::string baseVar = expr;
+        size_t bracketPos = expr.find('[');
+        if (bracketPos != std::string::npos) {
+            baseVar = expr.substr(0, bracketPos);
+        }
+
+        // Check for function call
+        size_t parenPos = baseVar.find('(');
+        if (parenPos != std::string::npos) {
+            baseVar = baseVar.substr(0, parenPos);
+        }
+
+        // Try to look up the type in the symbol table
+        bool found = false;
         // Check if it's a string literal
         if (expr.size() >= 2 && expr[0] == '\'' && expr.back() == '\'') {
             formatSpecifier = "%s";
             // Remove the single quotes from the expression and add double quotes for C string
-            formattedArg = "\"" + expr.substr(1, expr.size() - 2) + "\"";
+            formattedArg = "\"" + expr.substr(1, expr.size() - 2) + "\""; found = true;
         } else if (expr.find('.') != std::string::npos) {
             // Floating point values use %f
-            formatSpecifier = "%f";
-        } else if (expr == "0" || expr == "1" || expr == "true" || expr == "false") {
+            formatSpecifier = "%f"; found = true;
+        } else if (expr == "0" || expr == "1" || TranslatorUtils::toCIdentifier(expr) == "true" || TranslatorUtils::toCIdentifier(expr) == "false") {
             // Boolean values use %d (0/1 in C)
-            formatSpecifier = "%d";
-        } else {
-            // Try to look up the type in the symbol table
-            bool found = false;
-
-            // Check if it's an array access (contains square brackets)
-            std::string baseVar = expr;
-            size_t bracketPos = expr.find('[');
-            if (bracketPos != std::string::npos) {
-                baseVar = expr.substr(0, bracketPos);
-            }
-
-            // Check for function call
-            size_t parenPos = baseVar.find('(');
-            if (parenPos != std::string::npos) {
-                baseVar = baseVar.substr(0, parenPos);
-            }
-
+            formatSpecifier = "%d"; found = true;
+            formattedArg = expr.length() == 1 ? expr : (TranslatorUtils::toCIdentifier(expr) == "true" ? "1" : "0");
+        }else {
             // Look up variable type in symbol table
             if (symbolTable->hasSymbol(baseVar)) {
                 const SymbolEntry &entry = symbolTable->getSymbol(baseVar);
-
+                const std::string value = entry.value;
                 // Determine the format specifier based on the variable type
                 if (entry.dataType == PascalType::ARRAY && bracketPos != std::string::npos) {
                     // Use the array element type for array accesses
@@ -1400,6 +1420,7 @@ antlrcpp::Any PascalToCTranslator::visitWriteStatement(PascalSParser::WriteState
                         case PascalType::REAL: formatSpecifier = "%f"; found = true; break;
                         case PascalType::BOOLEAN: formatSpecifier = "%d"; found = true; break;
                         case PascalType::CHAR: formatSpecifier = "%c"; found = true; break;
+                        case PascalType::STRING: formatSpecifier = "%s"; found = true; break;
                         default: break;
                     }
                 } else {
@@ -1409,13 +1430,18 @@ antlrcpp::Any PascalToCTranslator::visitWriteStatement(PascalSParser::WriteState
                         case PascalType::REAL: formatSpecifier = "%f"; found = true; break;
                         case PascalType::BOOLEAN: formatSpecifier = "%d"; found = true; break;
                         case PascalType::CHAR: formatSpecifier = "%c"; found = true; break;
+                        case PascalType::STRING: formatSpecifier = "%s"; found = true; break;
                         default: break;
                     }
                 }
+            }else {
+                std::cout << "----------------------------------------------------------" << std::endl;
+                std::cout << "Error: Undefined variable " << baseVar << " in " << symbolTable->getCurrentScope().getScopeName()
+                          << ", line :" << context->start->getLine() << std::endl;
+                std::cout << "----------------------------------------------------------" << std::endl;
             }
-
-            if (!found) formatSpecifier = "%d";  // Default to integer format
         }
+        if (!found) formatSpecifier = "%d";  // Default to integer format
 
         formatStr += formatSpecifier;
         formattedArgs.push_back(formattedArg);
@@ -1433,6 +1459,12 @@ antlrcpp::Any PascalToCTranslator::visitWriteStatement(PascalSParser::WriteState
 
     return antlrcpp::Any();
 }
+
+antlrcpp::Any PascalToCTranslator::visitBreakStatement(PascalSParser::BreakStatementContext *context) {
+    output << getCurrentIndentation() << "break;\n";
+    return antlrcpp::Any();
+}
+
 
 /**
  * Processes a list of variables for input/output or other operations
@@ -1458,7 +1490,8 @@ antlrcpp::Any PascalToCTranslator::visitVariableList(PascalSParser::VariableList
     // Handle potential function return value marker
     if (result.is<std::pair<std::string, std::string>>()) {
         auto pair = result.as<std::pair<std::string, std::string>>();
-        vars.push_back(pair.second);  // Use the function name
+        // Use the function name with tmp suffix
+        vars.push_back(pair.second + "tmp");
     } else {
         // Regular variable
         vars.push_back(result.as<std::string>());
@@ -1477,12 +1510,12 @@ antlrcpp::Any PascalToCTranslator::visitVariable(PascalSParser::VariableContext 
     std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
 
     // Check if the variable is a function name in the current scope
-    // If so, we need to return special information to handle function results
     std::string currentScopeName = symbolTable->getCurrentScope().getScopeName();
 
     // Check if we're in a function and the variable name matches the function name
     if (id == currentScopeName) {
-        // This is a function return value assignment (function:=value)
+        // For a function return value, return a special pair to indicate this
+        // We'll handle this in visitStatement
         std::pair<std::string, std::string> resultPair("FUNCTION_RESULT", id);
         return resultPair;
     }
@@ -1496,6 +1529,12 @@ antlrcpp::Any PascalToCTranslator::visitVariable(PascalSParser::VariableContext 
         // Only consider as reference parameter if it's actually a parameter and marked as reference
         isReferenceParam = entry.isReference && entry.symbolType == SymbolType::PARAMETER;
         isArray = (entry.dataType == PascalType::ARRAY);
+    }
+    else {
+        std::cout << "----------------------------------------------------------" << std::endl;
+        std::cout << "Error: Undefined variable " << id << " in " << symbolTable->getCurrentScope().getScopeName()
+                  << ", line :" << context->start->getLine() << std::endl;
+        std::cout << "----------------------------------------------------------" << std::endl;
     }
 
     // Check if it's an array access
@@ -1515,7 +1554,7 @@ antlrcpp::Any PascalToCTranslator::visitVariable(PascalSParser::VariableContext 
         // Not an array access
         if (isReferenceParam && !isArray && symbolTable->hasSymbolInCurrentScope(id)) {
             // For non-array reference parameters, we need to dereference
-            result = "*" + id;
+            result = "(*" + id + ")";
         } else {
             result = id;
         }
@@ -1657,7 +1696,7 @@ antlrcpp::Any PascalToCTranslator::visitProcedureCall(PascalSParser::ProcedureCa
                         } else {
                             // Pass the fully indexed element (might need & if it's a VAR parameter)
                             if (isReferenceParam) {
-                                ss << "&" << args[i];
+                                ss << "(&(" << args[i] << "))";
                             } else {
                                 ss << args[i];
                             }
@@ -1669,7 +1708,7 @@ antlrcpp::Any PascalToCTranslator::visitProcedureCall(PascalSParser::ProcedureCa
                 }
                 // For non-array parameters that are passed by reference
                 else if (isReferenceParam) {
-                    ss << "&" << args[i];
+                    ss << "(&(" << args[i] << "))";
                     TranslatorUtils::logDebug("  Adding & to " + args[i]);
                 } else {
                     // Regular value parameter
@@ -1759,6 +1798,15 @@ antlrcpp::Any PascalToCTranslator::visitExpression(PascalSParser::ExpressionCont
     auto rightResult = visit(context->simpleExpression(1));
     std::string right = rightResult.as<std::string>();
 
+    // Check if the left or right operands are function names that should use their tmp variables
+    std::string currentScopeName = symbolTable->getCurrentScope().getScopeName();
+    if (left == currentScopeName) {
+        left = left + "tmp";
+    }
+    if (right == currentScopeName) {
+        right = right + "tmp";
+    }
+
     // Parenthesize the comparison for safety
     std::string result = "(" + left + " " + op + " " + right + ")";
     return antlrcpp::Any(result);
@@ -1785,6 +1833,15 @@ antlrcpp::Any PascalToCTranslator::visitSimpleExpression(PascalSParser::SimpleEx
     auto rightResult = visit(context->term());
     std::string right = rightResult.as<std::string>();
 
+    // Check if the left or right operands are function names that should use their tmp variables
+    std::string currentScopeName = symbolTable->getCurrentScope().getScopeName();
+    if (left == currentScopeName) {
+        left = left + "tmp";
+    }
+    if (right == currentScopeName) {
+        right = right + "tmp";
+    }
+
     // Parenthesize the expression for correct precedence
     return antlrcpp::Any(std::string("(") + left + " " + op + " " + right + ")");
 }
@@ -1809,6 +1866,15 @@ antlrcpp::Any PascalToCTranslator::visitTerm(PascalSParser::TermContext *context
 
     auto rightResult = visit(context->factor());
     std::string right = rightResult.as<std::string>();
+
+    // Check if the left or right operands are function names that should use their tmp variables
+    std::string currentScopeName = symbolTable->getCurrentScope().getScopeName();
+    if (left == currentScopeName) {
+        left = left + "tmp";
+    }
+    if (right == currentScopeName) {
+        right = right + "tmp";
+    }
 
     // Parenthesize the expression for correct precedence
     return antlrcpp::Any(std::string("(") + left + " " + op + " " + right + ")");
@@ -1838,6 +1904,14 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
     // Function call
     else if (context->ID() && context->expressionList()) {
         std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
+
+        if(!symbolTable->hasSymbol(id)){
+            std::cout << "----------------------------------------------------------" << std::endl;
+            std::cout << "Error: Undefined variable " << id << " in "
+                      << symbolTable->getCurrentScope().getScopeName() << ", line :" << context->start->getLine()
+                      << std::endl;
+            std::cout << "----------------------------------------------------------" << std::endl;
+        }
 
         auto result = visit(context->expressionList());
         std::vector<std::string> args = result.as<std::vector<std::string>>();
@@ -1938,7 +2012,7 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
                         } else {
                             // Pass the fully indexed element (might need & if it's a VAR parameter)
                             if (isReferenceParam) {
-                                ss << "&" << args[i];
+                                ss << "(&(" << args[i] << "))";
                             } else {
                                 ss << args[i];
                             }
@@ -1949,11 +2023,8 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
                     }
                 }
                 // For non-array parameters that are passed by reference
-                else if (isReferenceParam &&
-                         args[i].find('[') == std::string::npos &&
-                         args[i].find('(') == std::string::npos &&
-                         !args[i].empty() && args[i][0] != '*') {
-                    ss << "&" << args[i];
+                else if (isReferenceParam) {
+                    ss << "(&(" << args[i] << "))";
                     TranslatorUtils::logDebug("  Adding & to " + args[i]);
                 } else {
                     // Regular value parameter
@@ -1974,6 +2045,14 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
     else if (context->ID() && !context->expressionList()) {
         std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
 
+        if(!symbolTable->hasSymbol(id)){
+            std::cout << "----------------------------------------------------------" << std::endl;
+            std::cout << "Error: Undefined variable " << id << " in "
+                      << symbolTable->getCurrentScope().getScopeName() << ", line :" << context->start->getLine()
+                      << std::endl;
+            std::cout << "----------------------------------------------------------" << std::endl;
+        }
+
         // Check if this ID is a function in the symbol table
         if (symbolTable->hasSymbol(id)) {
             const SymbolEntry& entry = symbolTable->getSymbol(id);
@@ -1987,9 +2066,21 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
                     // In C, we need to add the parentheses
                     return id + "()";
                 }
+            } else if (entry.symbolType == SymbolType::PARAMETER) {
+                if (entry.isReference && symbolTable->hasSymbolInCurrentScope(id)) {
+                    // For non-array reference parameters, we need to dereference when accessing
+                    return "(*" + id + ")";
+                }
+            }
+            
+            // Special case: if we're in a function and we're referencing the function's name 
+            // as a variable (typical for recursive functions in Pascal)
+            if (id == symbolTable->getCurrentScope().getScopeName()) {
+                // This is accessing our own function's return value
+                return id + "tmp";
             }
         }
-
+        
         // If not recognized as a function with no parameters, treat as a regular variable
         return id;
     }
@@ -1997,15 +2088,42 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
     else if (context->NOT()) {
         auto result = visit(context->factor());
         std::string factor = result.as<std::string>();
-
-        return antlrcpp::Any(std::string("!(") + factor + ")");
+        if(!((factor[0]>='0' && factor[0]<='9') || factor[0]=='(' || factor[0]=='-' || factor[0]=='~' ||factor[0]=='+') && (!symbolTable->hasSymbol(factor))) {
+            std::cout << "----------------------------------------------------------" << std::endl;
+            std::cout << "Error: Undefined variable " << factor << " in "
+                      << symbolTable->getCurrentScope().getScopeName() << ", line :" << context->start->getLine()
+                      << std::endl;
+            std::cout << "----------------------------------------------------------" << std::endl;
+        }
+        return antlrcpp::Any(std::string("~(") + factor + ")");
     }
     // Unary minus operation
     else if (context->MINUS()) {
         auto result = visit(context->factor());
         std::string factor = result.as<std::string>();
+        if(!((factor[0]>='0' && factor[0]<='9') || factor[0]=='(' || factor[0]=='-' || factor[0]=='~' ||factor[0]=='+') && (!symbolTable->hasSymbol(factor))) {
+            std::cout << "----------------------------------------------------------" << std::endl;
+            std::cout << "Error: Undefined variable " << factor << " in "
+                      << symbolTable->getCurrentScope().getScopeName() << ", line :" << context->start->getLine()
+                      << std::endl;
+            std::cout << "----------------------------------------------------------" << std::endl;
+        }
 
         return antlrcpp::Any(std::string("-(") + factor + ")");
+    }
+    // Unary plus operation
+    else if (context->PLUS()) {
+        auto result = visit(context->factor());
+        std::string factor = result.as<std::string>();
+        if(!((factor[0]>='0' && factor[0]<='9') || factor[0]=='(' || factor[0]=='-' || factor[0]=='~' ||factor[0]=='+') && (!symbolTable->hasSymbol(factor))) {
+            std::cout << "----------------------------------------------------------" << std::endl;
+            std::cout << "Error: Undefined variable " << factor << " in "
+                      << symbolTable->getCurrentScope().getScopeName() << ", line :" << context->start->getLine()
+                      << std::endl;
+            std::cout << "----------------------------------------------------------" << std::endl;
+        }
+
+        return antlrcpp::Any(std::string("+(") + factor + ")");
     }
     // String literal
     else if (context->STRING()) {
@@ -2013,7 +2131,7 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
     }
     // Character literal
     else if (context->LETTER()) {
-        return context->LETTER()->getText();
+        return antlrcpp::Any(std::string ((TranslatorUtils::toCIdentifier(context->LETTER()->getText()) == "true") ? "1" : "0"));
     }
 
     return antlrcpp::Any(std::string(""));

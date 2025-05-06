@@ -65,6 +65,7 @@ class PascalToCTranslator : public PascalSVisitor {
     antlrcpp::Any visitReadStatement(PascalSParser::ReadStatementContext *context) override;
     antlrcpp::Any visitWhileStatement(PascalSParser::WhileStatementContext *context) override;
     antlrcpp::Any visitWriteStatement(PascalSParser::WriteStatementContext *context) override;
+    antlrcpp::Any visitBreakStatement(PascalSParser::BreakStatementContext *context) override;
     antlrcpp::Any visitVariableList(PascalSParser::VariableListContext *context) override;
     antlrcpp::Any visitVariable(PascalSParser::VariableContext *context) override;
     antlrcpp::Any visitIdVarPart(PascalSParser::IdVarPartContext *context) override;

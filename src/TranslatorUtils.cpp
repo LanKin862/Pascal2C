@@ -63,13 +63,13 @@ std::string TranslatorUtils::toCIdentifier(const std::string& pascalIdentifier) 
     // Check for C keywords and add underscore prefix if necessary
     // This prevents conflicts with reserved words in C
     static const std::vector<std::string> cKeywords = {
-        "auto", "break", "case", "char", "const", "continue", "default",
-        "do", "double", "else", "enum", "extern", "float", "for", "goto",
-        "if", "int", "long", "register", "return", "short", "signed",
-        "sizeof", "static", "struct", "switch", "typedef", "union",
-        "unsigned", "void", "volatile", "while"};
+            "auto", "break", "case", "char", "const", "continue", "default",
+            "do", "double", "else", "enum", "extern", "float", "for", "goto",
+            "if", "int", "long", "register", "return", "short", "signed",
+            "sizeof", "static", "struct", "switch", "typedef", "union",
+            "unsigned", "void", "volatile", "while"};
 
-    if (std::find(cKeywords.begin(), cKeywords.end(), result) != cKeywords.end()) {
+    if (std::find(cKeywords.begin(), cKeywords.end(), result) != cKeywords.end() && result != "") {
         result = "_" + result;
     }
 

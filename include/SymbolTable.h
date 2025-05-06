@@ -20,7 +20,8 @@ enum class PascalType {
     REAL,
     BOOLEAN,
     CHAR,
-    ARRAY
+    ARRAY,
+    STRING
 };
 
 namespace std {
