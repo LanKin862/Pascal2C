@@ -69,7 +69,7 @@ std::string TranslatorUtils::toCIdentifier(const std::string& pascalIdentifier) 
             "sizeof", "static", "struct", "switch", "typedef", "union",
             "unsigned", "void", "volatile", "while"};
 
-    if (std::find(cKeywords.begin(), cKeywords.end(), result) != cKeywords.end() && result != "") {
+    if (std::find(cKeywords.begin(), cKeywords.end(), result) != cKeywords.end()) {
         result = "_" + result;
     }
 
