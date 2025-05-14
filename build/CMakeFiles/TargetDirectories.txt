@@ -1,6 +1,0 @@
-/mnt/d/ClionCode/Pascal2C/build/CMakeFiles/antlr4_runtime.dir
-/mnt/d/ClionCode/Pascal2C/build/CMakeFiles/antlr4_runtime-build_static.dir
-/mnt/d/ClionCode/Pascal2C/build/CMakeFiles/antlr4_runtime-build_shared.dir
-/mnt/d/ClionCode/Pascal2C/build/CMakeFiles/pascc.dir
-/mnt/d/ClionCode/Pascal2C/build/CMakeFiles/edit_cache.dir
-/mnt/d/ClionCode/Pascal2C/build/CMakeFiles/rebuild_cache.dir

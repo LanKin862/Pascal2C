@@ -1,6 +1,0 @@
-# Target labels
- antlr4_runtime
-# Source files and their labels
-/mnt/d/ClionCode/Pascal2C/build/CMakeFiles/antlr4_runtime-build_static
-/mnt/d/ClionCode/Pascal2C/build/CMakeFiles/antlr4_runtime-build_static.rule
-/mnt/d/ClionCode/Pascal2C/build/antlr4_runtime/src/antlr4_runtime-stamp/antlr4_runtime-build_static.rule
