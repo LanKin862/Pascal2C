@@ -22,12 +22,12 @@ PascalToCTranslator::PascalToCTranslator()
 }
 
 /**
- * 将Pascal代码转换为C代码的主翻译方法
+ * 主翻译方法，将Pascal代码转换为C代码
  * @param inputFile Pascal源文件的路径
- * @return 包含翻译后C代码的字符串
+ * @return 包含翻译后的C代码的字符串
  */
 std::string PascalToCTranslator::translate(const std::string &inputFile) {
-    // 清除状态进行全新翻译
+    // 为新的翻译清除状态
     output.str("");
     indentation = "";
     isInGlobalScope = true;
@@ -57,14 +57,14 @@ std::string PascalToCTranslator::translate(const std::string &inputFile) {
 }
 
 /**
- * 增加一个单位的缩进级别（4个空格）
+ * 增加缩进级别一个单位（4个空格）
  */
 void PascalToCTranslator::increaseIndentation() {
     indentation += "    ";
 }
 
 /**
- * 减少一个单位的缩进级别（4个空格）
+ * 减少缩进级别一个单位（4个空格）
  * 确保缩进不会变为负值
  */
 void PascalToCTranslator::decreaseIndentation() {
@@ -75,14 +75,14 @@ void PascalToCTranslator::decreaseIndentation() {
 
 /**
  * 返回当前缩进字符串
- * @return 当前缩进，表示为空格字符串
+ * @return 当前缩进，表示为一串空格
  */
 std::string PascalToCTranslator::getCurrentIndentation() const {
     return indentation;
 }
 
 /**
- * 生成唯一的临时变量名
+ * 生成一个唯一的临时变量名
  * @return 表示新临时变量的字符串
  */
 std::string PascalToCTranslator::getNextTempVar() {
@@ -90,21 +90,21 @@ std::string PascalToCTranslator::getNextTempVar() {
 }
 
 /**
- * 处理程序节点，这是解析树的根
- * 生成Pascal程序所需的标准包含和辅助函数
- * @param context 解析器中的程序上下文
+ * 处理程序节点，它是解析树的根
+ * 生成Pascal程序需要的标准包含文件和辅助函数
+ * @param context 来自解析器的程序上下文
  * @return 访问者模式的标准占位符
  */
 antlrcpp::Any PascalToCTranslator::visitProgram(PascalSParser::ProgramContext *context) {
-    // 生成Pascal功能所需的标准C包含
+    // 为Pascal功能生成标准C包含文件
     output << "#include <stdio.h>\n";
     output << "#include <stdlib.h>\n";
     output << "#include <stdbool.h>\n";
     output << "#include <string.h>\n";
     output << "#include <stdarg.h>\n\n";
 
-    // 定义Pascal特定类型和辅助函数
-    output << "// Pascal特定函数和类型\n";
+    // 定义Pascal特定的类型和辅助函数
+    output << "// Pascal-specific functions and types\n";
     output << "typedef int boolean;\n";
     output << "typedef char *string;\n\n";
 
@@ -114,7 +114,7 @@ antlrcpp::Any PascalToCTranslator::visitProgram(PascalSParser::ProgramContext *c
 
 /**
  * 处理由头部和主体组成的程序结构
- * @param context 解析器中的程序结构上下文
+ * @param context 来自解析器的程序结构上下文
  * @return 访问者模式的标准占位符
  */
 antlrcpp::Any PascalToCTranslator::visitProgramStruct(PascalSParser::ProgramStructContext *context) {
@@ -129,7 +129,7 @@ antlrcpp::Any PascalToCTranslator::visitProgramStruct(PascalSParser::ProgramStru
 
 /**
  * 处理包含程序名称的程序头部
- * @param context 解析器中的程序头部上下文
+ * @param context 来自解析器的程序头部上下文
  * @return 访问者模式的标准占位符
  */
 antlrcpp::Any PascalToCTranslator::visitProgramHead(PascalSParser::ProgramHeadContext *context) {
@@ -137,23 +137,23 @@ antlrcpp::Any PascalToCTranslator::visitProgramHead(PascalSParser::ProgramHeadCo
     std::string programName = context->ID()->getText();
 
     // 在C代码中添加程序名称作为注释
-    output << "// 程序: " << programName << "\n\n";
+    output << "// Program: " << programName << "\n\n";
 
     return antlrcpp::Any();
 }
 
 /**
  * 处理包含声明和复合语句的程序主体
- * @param context 解析器中的程序主体上下文
+ * @param context 来自解析器的程序主体上下文
  * @return 访问者模式的标准占位符
  */
 antlrcpp::Any PascalToCTranslator::visitProgramBody(PascalSParser::ProgramBodyContext *context) {
-    // 如果存在常量声明则处理
+    // 如果存在，处理常量声明
     if (context->constDeclarations()) {
         visit(context->constDeclarations());
     }
 
-    // 如果存在变量声明则处理
+    // 如果存在，处理变量声明
     if (context->varDeclarations()) {
         visit(context->varDeclarations());
     }
@@ -165,7 +165,7 @@ antlrcpp::Any PascalToCTranslator::visitProgramBody(PascalSParser::ProgramBodyCo
         std::stringstream tempOutput = std::move(output);
         output = std::move(forwardDeclsStream);
 
-        output << "// 前向声明\n";
+        output << "// Forward declarations\n";
         generateForwardDeclarations(context->subprogramDeclarations());
         output << "\n";
 
@@ -175,7 +175,7 @@ antlrcpp::Any PascalToCTranslator::visitProgramBody(PascalSParser::ProgramBodyCo
         output << forwardDecls;
     }
 
-    // 如果存在子程序（函数/过程）声明则处理
+    // 如果存在，处理子程序（函数/过程）声明
     if (context->subprogramDeclarations()) {
         visit(context->subprogramDeclarations());
     }
@@ -199,25 +199,25 @@ antlrcpp::Any PascalToCTranslator::visitProgramBody(PascalSParser::ProgramBodyCo
 }
 
 /**
- * Helper method to generate forward declarations for all functions and procedures
- * This is needed to handle function references and maintain proper parameter types
- * @param context The subprogram declarations context
+ * 用于生成所有函数和过程的前向声明的辅助方法
+ * 这对于处理函数引用和维护正确的参数类型是必要的
+ * @param context 子程序声明上下文
  */
 void PascalToCTranslator::generateForwardDeclarations(PascalSParser::SubprogramDeclarationsContext *context) {
     if (!context) return;
 
-    // Then process any nested declarations first (earlier in source)
+    // 首先处理任何嵌套声明（在源码中较早出现）
     if (context->subprogramDeclarations()) {
         generateForwardDeclarations(context->subprogramDeclarations());
     }
-    // Process the current subprogram (later in source)
+    // 处理当前子程序（在源码中较晚出现）
     if (context->subprogram()) {
         PascalSParser::SubprogramHeadContext *headContext = context->subprogram()->subprogramHead();
         if (headContext) {
             std::string name = TranslatorUtils::toCIdentifier(headContext->ID()->getText());
             bool isFunction = headContext->FUNCTION() != nullptr;
 
-            // Get return type for functions
+            // 获取函数的返回类型
             std::string returnType = "void";
             if (isFunction && headContext->basicType()) {
                 auto result = visit(headContext->basicType());
@@ -225,29 +225,29 @@ void PascalToCTranslator::generateForwardDeclarations(PascalSParser::SubprogramD
                 returnType = typeConverter->convertType(pascalReturnType);
             }
 
-            // Get parameters
+            // 获取参数
             std::string params = "()";
             if (headContext->formalParameter()) {
                 auto paramsResult = visit(headContext->formalParameter());
                 params = paramsResult.as<std::string>();
             }
 
-            // Output forward declaration
+            // 输出前向声明
             output << returnType << " " << name << params << ";\n";
-            std::cout << "为 " << name << " 生成前向声明\n";
+            std::cout << "Forward declaration for " << name << " generated\n";
         }
     }
 }
 
 /**
- * Processes an identifier list, used for variable and parameter declarations
- * @param context The identifier list context from the parser
- * @return Vector of C-compatible identifier strings
+ * 处理标识符列表，用于变量和参数声明
+ * @param context 来自解析器的标识符列表上下文
+ * @return C兼容标识符字符串的向量
  */
 antlrcpp::Any PascalToCTranslator::visitIdList(PascalSParser::IdListContext *context) {
     std::vector<std::string> ids;
 
-    // Collect all identifiers and convert them to C-compatible names
+    // 收集所有标识符并将它们转换为C兼容的名称
     for (auto id: context->ID()) {
         ids.push_back(TranslatorUtils::toCIdentifier(id->getText()));
     }
@@ -256,19 +256,19 @@ antlrcpp::Any PascalToCTranslator::visitIdList(PascalSParser::IdListContext *con
 }
 
 /**
- * Processes constant declarations section
- * @param context The constant declarations context
- * @return Standard placeholder for visitor pattern
+ * 处理常量声明部分
+ * @param context 常量声明上下文
+ * @return 访问者模式的标准占位符
  */
 antlrcpp::Any PascalToCTranslator::visitConstDeclarations(PascalSParser::ConstDeclarationsContext *context) {
-    // Check if there are any constant declarations
+    // 检查是否有任何常量声明
     if (!context->constDeclaration()) {
         return antlrcpp::Any();
     }
 
     output << "// Constants\n";
 
-    // Visit constant declaration nodes
+    // 访问常量声明节点
     visit(context->constDeclaration());
 
     output << "\n";
@@ -277,24 +277,24 @@ antlrcpp::Any PascalToCTranslator::visitConstDeclarations(PascalSParser::ConstDe
 }
 
 /**
- * Processes individual constant declarations
- * Converts Pascal constants to C #define statements
- * @param context The constant declaration context
- * @return Standard placeholder for visitor pattern
+ * 处理单个常量声明
+ * 将Pascal常量转换为C的#define语句
+ * @param context 常量声明上下文
+ * @return 访问者模式的标准占位符
  */
 antlrcpp::Any PascalToCTranslator::visitConstDeclaration(PascalSParser::ConstDeclarationContext *context) {
     std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
 
-    // Get constant value
+    // 获取常量值
     std::string value = visit(context->constValue()).as<std::string>();
 
-    // Add constant to symbol table
+    // 添加常量到符号表
     SymbolEntry entry;
     entry.name = id;
     entry.symbolType = SymbolType::CONSTANT;
     entry.value = value;
 
-    // Try to infer the type from the value's format
+    // 尝试从值的格式推断类型
     if (value.find('.') != std::string::npos) {
         entry.dataType = PascalType::REAL;
     } else if (TranslatorUtils::toCIdentifier(value) == "true" || TranslatorUtils::toCIdentifier(value) == "false") {
@@ -309,10 +309,10 @@ antlrcpp::Any PascalToCTranslator::visitConstDeclaration(PascalSParser::ConstDec
 
     symbolTable->addSymbol(entry);
 
-    // Output as a C preprocessor define
+    // 输出为C预处理器定义
     output << "#define " << entry.name << " " << entry.value << "\n";
 
-    // Process additional constant declarations if any (recursively)
+    // 如果有其他常量声明，则递归处理
     if (context->constDeclaration()) {
         visit(context->constDeclaration());
     }
@@ -321,13 +321,13 @@ antlrcpp::Any PascalToCTranslator::visitConstDeclaration(PascalSParser::ConstDec
 }
 
 /**
- * Processes constant values including numbers, letters, and strings
- * @param context The constant value context
- * @return String representation of the constant value
+ * 处理常量值，包括数字、字母和字符串
+ * @param context 常量值上下文
+ * @return 常量值的字符串表示
  */
 antlrcpp::Any PascalToCTranslator::visitConstValue(PascalSParser::ConstValueContext *context) {
     if (context->num()) {
-        // Handle numeric constants, preserving sign
+        // 处理数字常量，保留符号
         if (context->PLUS()) {
             return "+" + context->num()->getText();
         } else if (context->MINUS()) {
@@ -336,10 +336,10 @@ antlrcpp::Any PascalToCTranslator::visitConstValue(PascalSParser::ConstValueCont
             return context->num()->getText();
         }
     } else if (context->LETTER()) {
-        // Handle character constants
+        // 处理字符常量
         return context->LETTER()->getText();
     } else if (context->STRING()) {
-        // Handle string constants
+        // 处理字符串常量
         return context->STRING()->getText();
     }
 
@@ -347,19 +347,19 @@ antlrcpp::Any PascalToCTranslator::visitConstValue(PascalSParser::ConstValueCont
 }
 
 /**
- * Processes variable declarations section
- * @param context The variable declarations context
- * @return Standard placeholder for visitor pattern
+ * 处理变量声明部分
+ * @param context 变量声明上下文
+ * @return 访问者模式的标准占位符
  */
 antlrcpp::Any PascalToCTranslator::visitVarDeclarations(PascalSParser::VarDeclarationsContext *context) {
-    // Check if there are any variable declarations
+    // 检查是否有任何变量声明
     if (!context->varDeclaration()) {
         return antlrcpp::Any();
     }
 
     output << "// Variables\n";
 
-    // Visit variable declaration nodes
+    // 访问变量声明节点
     visit(context->varDeclaration());
 
     output << "\n";
@@ -368,32 +368,32 @@ antlrcpp::Any PascalToCTranslator::visitVarDeclarations(PascalSParser::VarDeclar
 }
 
 /**
- * Processes individual variable declarations
- * Converts Pascal variable declarations to C variable declarations with initialization
- * @param context The variable declaration context
- * @return Standard placeholder for visitor pattern
+ * 处理单个变量声明
+ * 将Pascal变量声明转换为带初始化的C变量声明
+ * @param context 变量声明上下文
+ * @return 访问者模式的标准占位符
  */
 antlrcpp::Any PascalToCTranslator::visitVarDeclaration(PascalSParser::VarDeclarationContext *context) {
-    // Get list of variable identifiers
+    // 获取变量标识符列表
     std::vector<std::string> ids = visit(context->idList()).as<std::vector<std::string>>();
 
-    // Get type information
+    // 获取类型信息
     auto typeResult = visit(context->type());
 
-    // Initialize variables for type information
+    // 初始化类型信息变量
     std::string typeStr;
     PascalType pascalType;
-    PascalType elementType = PascalType::INTEGER; // Default element type for arrays
+    PascalType elementType = PascalType::INTEGER; // 数组的默认元素类型
     std::vector<ArrayBounds> dimensions;
 
-    // Extract type information based on whether it's an array or basic type
+    // 基于是基本类型还是数组类型提取类型信息
     try {
-        // Try to extract as a basic type first
+        // 首先尝试提取为基本类型
         auto typePair = typeResult.as<std::pair<std::string, PascalType>>();
         typeStr = typePair.first;
         pascalType = typePair.second;
     } catch (const std::bad_cast &) {
-        // If not a basic type, it's an array type
+        // 如果不是基本类型，就是数组类型
         try {
             auto arrayTypeInfo = typeResult.as<std::tuple<std::string, PascalType, PascalType, std::vector<ArrayBounds>>>();
             typeStr = std::get<0>(arrayTypeInfo);
@@ -409,51 +409,51 @@ antlrcpp::Any PascalToCTranslator::visitVarDeclaration(PascalSParser::VarDeclara
         }
     }
 
-    // Output variable declarations for each identifier
+    // 为每个标识符输出变量声明
     for (auto &id: ids) {
-        // Handle array types with array dimensions in the type string
+        // 处理类型字符串中带有数组维度的数组类型
         std::regex pattern("\\[.*\\]");
         std::smatch matches;
         if (std::regex_search(typeStr, matches, pattern)) {
-            // For array types, put the dimensions after the identifier
+            // 对于数组类型，在标识符后放置维度
             std::string tmpId = id + std::string(matches[0]);
             std::string tmpTypeStr = std::regex_replace(typeStr, pattern, "");
             output << tmpTypeStr << " " << tmpId;
 
-            // For multidimensional arrays, add initialization code to zero out all elements
+            // 对于多维数组，添加初始化代码将所有元素置零
             if (pascalType == PascalType::ARRAY && dimensions.size() > 1) {
-                output << " = {0}";  // C99 and later support this syntax for zero initialization
+                output << " = {0}";  // C99及以后支持这种零初始化语法
             }
         } else {
-            // For basic types, standard format
+            // 对于基本类型，使用标准格式
             output << typeStr << " " << id;
         }
 
-        // Only add initialization for non-array types (arrays are more complex to initialize)
+        // 只为非数组类型添加初始化（数组的初始化更复杂）
         if (pascalType != PascalType::ARRAY) {
-            // Initialize with default values based on type
+            // 根据类型用默认值初始化
             if (pascalType == PascalType::INTEGER) {
                 output << " = 0";
             } else if (pascalType == PascalType::REAL) {
                 output << " = 0.0";
             } else if (pascalType == PascalType::BOOLEAN) {
-                output << " = 0";  // false in C
+                output << " = 0";  // C中的false
             } else if (pascalType == PascalType::CHAR) {
                 output << " = '\\0'";
             }
         } else if (dimensions.size() == 1) {
-            // For single dimension arrays, add simple zero initialization
-            output << " = {0}";  // C99 and later support this syntax for zero initialization
+            // 对于单维数组，添加简单的零初始化
+            output << " = {0}";  // C99及以后支持这种零初始化语法
         }
         output << ";\n";
 
-        // Add variable to symbol table for type checking and reference
+        // 将变量添加到符号表进行类型检查和引用
         SymbolEntry entry;
         entry.name = id;
         entry.symbolType = SymbolType::VARIABLE;
         entry.dataType = pascalType;
 
-        // Store array-specific information if needed
+        // 如果需要，存储数组特定信息
         if (pascalType == PascalType::ARRAY) {
             entry.arrayElementType = elementType;
             entry.arrayDimensions = dimensions;
@@ -462,7 +462,7 @@ antlrcpp::Any PascalToCTranslator::visitVarDeclaration(PascalSParser::VarDeclara
         symbolTable->addSymbol(entry);
     }
 
-    // Process additional variable declarations if any (recursively)
+    // 如果有其他变量声明，则递归处理
     if (context->varDeclaration()) {
         visit(context->varDeclaration());
     }
@@ -471,30 +471,30 @@ antlrcpp::Any PascalToCTranslator::visitVarDeclaration(PascalSParser::VarDeclara
 }
 
 /**
- * Processes type declarations, handling both basic types and arrays
- * @param context The type context
- * @return Type information as either a pair (for basic types) or tuple (for array types)
+ * 处理类型声明，处理基本类型和数组
+ * @param context 类型上下文
+ * @return 类型信息，基本类型为对（pair），数组类型为元组（tuple）
  */
 antlrcpp::Any PascalToCTranslator::visitType(PascalSParser::TypeContext *context) {
     if (context->basicType() && context->ARRAY() == nullptr) {
-        // Basic type (integer, real, boolean, char)
+        // 基本类型（整数、实数、布尔、字符）
         auto result = visit(context->basicType());
         PascalType type = result.as<PascalType>();
         std::string typeStr = typeConverter->convertType(type);
         return std::make_pair(typeStr, type);
     } else if (context->ARRAY()) {
-        // Array type with dimensions
+        // 带维度的数组类型
         auto basicTypeResult = visit(context->basicType());
         PascalType elementType = basicTypeResult.as<PascalType>();
 
-        // Get array dimensions (bounds)
+        // 获取数组维度（边界）
         auto periodResult = visit(context->period());
         std::vector<ArrayBounds> dimensions = periodResult.as<std::vector<ArrayBounds>>();
 
-        // Convert to C array type using the type converter
+        // 使用类型转换器转换为C数组类型
         std::string arrayTypeStr = typeConverter->convertArrayType(elementType, dimensions);
 
-        // Return array type, element type, and dimensions as a tuple
+        // 返回数组类型、元素类型和维度作为元组
         return std::make_tuple(arrayTypeStr, PascalType::ARRAY, elementType, dimensions);
     }
 
@@ -502,9 +502,9 @@ antlrcpp::Any PascalToCTranslator::visitType(PascalSParser::TypeContext *context
 }
 
 /**
- * Processes basic type keywords (INTEGER, REAL, BOOLEAN, CHAR)
- * @param context The basic type context
- * @return PascalType enum value representing the type
+ * 处理基本类型关键字（INTEGER、REAL、BOOLEAN、CHAR）
+ * @param context 基本类型上下文
+ * @return 表示类型的PascalType枚举值
  */
 antlrcpp::Any PascalToCTranslator::visitBasicType(PascalSParser::BasicTypeContext *context) {
     if (context->INTEGER()) {
@@ -521,16 +521,16 @@ antlrcpp::Any PascalToCTranslator::visitBasicType(PascalSParser::BasicTypeContex
 }
 
 /**
- * Processes array index range declarations (e.g., 1..10, 0..9)
- * @param context The period context containing range bounds
- * @return Vector of ArrayBounds structures with lower and upper bounds
+ * 处理数组索引范围声明（如1..10、0..9）
+ * @param context 包含范围边界的周期上下文
+ * @return 包含上下边界的ArrayBounds结构向量
  */
 antlrcpp::Any PascalToCTranslator::visitPeriod(PascalSParser::PeriodContext *context) {
     std::vector<ArrayBounds> dimensions;
     std::vector<std::string> numStrings;
     std::string periodStr = context->getText();
 
-    // Extract all pairs of numbers separated by DOTDOT (..)
+    // 提取所有由DOTDOT（..）分隔的数字对
     std::regex pattern(R"((\d+)\.\.(\d+))");  // 匹配 "数字..数字"
     std::smatch matches;
 
@@ -542,7 +542,7 @@ antlrcpp::Any PascalToCTranslator::visitPeriod(PascalSParser::PeriodContext *con
         numStrings.push_back(matches[2].str());  // 上界（如 "4"）
         begin = matches[0].second;           // 继续匹配剩余部分
     }
-    // Convert bounds to integers and store in ArrayBounds structures
+    // 将边界转换为整数并存储在ArrayBounds结构中
     for (int i = 0; i < numStrings.size(); i += 2) {
         if (i + 1 < numStrings.size()) {
             ArrayBounds bounds;
@@ -555,22 +555,22 @@ antlrcpp::Any PascalToCTranslator::visitPeriod(PascalSParser::PeriodContext *con
 }
 
 /**
- * Processes subprogram (function/procedure) declarations
- * @param context The subprogram declarations context
- * @return Standard placeholder for visitor pattern
+ * 处理子程序（函数/过程）声明
+ * @param context 子程序声明上下文
+ * @return 访问者模式的标准占位符
  */
 antlrcpp::Any PascalToCTranslator::visitSubprogramDeclarations(PascalSParser::SubprogramDeclarationsContext *context) {
-    // Check if there are any subprogram declarations
+    // 检查是否有任何子程序声明
     if (!context->subprogramDeclarations() && !context->subprogram()) {
         return antlrcpp::Any();
     }
 
-    // First process the current subprogram declarations, which comes earlier in the source
+    // 首先处理当前子程序声明，这在源代码中较早出现
     if (context->subprogramDeclarations()) {
         visit(context->subprogramDeclarations());
     }
 
-    // Then process additional subprogram that come later in the source
+    // 然后处理在源代码中较晚出现的其他子程序
     if (context->subprogram()) {
         visit(context->subprogram());
     }
@@ -578,19 +578,19 @@ antlrcpp::Any PascalToCTranslator::visitSubprogramDeclarations(PascalSParser::Su
 }
 
 /**
- * Processes a single subprogram (function or procedure)
- * @param context The subprogram context
- * @return Standard placeholder for visitor pattern
+ * 处理单个子程序（函数或过程）
+ * @param context 子程序上下文
+ * @return 访问者模式的标准占位符
  */
 antlrcpp::Any PascalToCTranslator::visitSubprogram(PascalSParser::SubprogramContext *context) {
-    // Visit subprogram head to generate function signature
+    // 访问子程序头部以生成函数签名
     visit(context->subprogramHead());
 
-    // Add opening brace for function body
+    // 为函数体添加开括号
     output << " {\n";
     increaseIndentation();
 
-    // For functions, add a return value variable with the same name as the function
+    // 对于函数，添加一个与函数同名的返回值变量
     if (context->subprogramHead()->FUNCTION()) {
         std::string funcName = TranslatorUtils::toCIdentifier(context->subprogramHead()->ID()->getText());
         std::string funcNameTmp = funcName + "tmp";
@@ -598,7 +598,7 @@ antlrcpp::Any PascalToCTranslator::visitSubprogram(PascalSParser::SubprogramCont
         PascalType returnType = typeResult.as<PascalType>();
         std::string cType = typeConverter->convertType(returnType);
 
-        // Initialize the return value variable based on type
+        // 根据类型初始化返回值变量
         output << getCurrentIndentation() << cType << " " << funcNameTmp << " = ";
         if (returnType == PascalType::INTEGER) {
             output << "0";
@@ -611,12 +611,12 @@ antlrcpp::Any PascalToCTranslator::visitSubprogram(PascalSParser::SubprogramCont
         } else if (returnType == PascalType::STRING) {
             output << "\"\"";
         } else if (returnType == PascalType::ARRAY) {
-            // Arrays are initialized to zero by default in C
+            // 数组在C中默认初始化为零
             output << "{0}";
         }
         output << ";\n";
 
-        // Also store the temporary variable name in the symbol table so we can reference it correctly
+        // 同时将临时变量名存储在符号表中，以便我们能正确引用
         SymbolEntry tmpEntry;
         tmpEntry.name = funcNameTmp;
         tmpEntry.symbolType = SymbolType::VARIABLE;
@@ -624,10 +624,10 @@ antlrcpp::Any PascalToCTranslator::visitSubprogram(PascalSParser::SubprogramCont
         symbolTable->addSymbol(tmpEntry);
     }
 
-    // Visit subprogram body to generate function implementation
+    // 访问子程序主体以生成函数实现
     visit(context->subprogramBody());
 
-    // For functions, add a return statement at the end if there isn't one
+    // 对于函数，如果没有返回语句，在末尾添加一个
     if (context->subprogramHead()->FUNCTION()) {
         std::string funcName = TranslatorUtils::toCIdentifier(context->subprogramHead()->ID()->getText());
         std::string funcNameTmp = funcName + "tmp";
@@ -642,20 +642,20 @@ antlrcpp::Any PascalToCTranslator::visitSubprogram(PascalSParser::SubprogramCont
 }
 
 /**
- * Processes a subprogram header (function or procedure declaration)
- * @param context The subprogram header context
- * @return Standard placeholder for visitor pattern
+ * 处理子程序头部（函数或过程声明）
+ * @param context 子程序头部上下文
+ * @return 访问者模式的标准占位符
  */
 antlrcpp::Any PascalToCTranslator::visitSubprogramHead(PascalSParser::SubprogramHeadContext *context) {
-    // Get function/procedure name and convert to C identifier
+    // 获取函数/过程名称并转换为C标识符
     std::string name = TranslatorUtils::toCIdentifier(context->ID()->getText());
 
-    // Determine if this is a function or procedure
+    // 确定这是函数还是过程
     bool isFunction = context->FUNCTION() != nullptr;
 
-    // Get return type for functions (procedures default to void)
+    // 获取函数的返回类型（过程默认为void）
     std::string returnType = "void";
-    PascalType pascalReturnType = PascalType::INTEGER;  // Default
+    PascalType pascalReturnType = PascalType::INTEGER;  // 默认
 
     if (isFunction) {
         auto result = visit(context->basicType());
@@ -663,29 +663,29 @@ antlrcpp::Any PascalToCTranslator::visitSubprogramHead(PascalSParser::Subprogram
         returnType = typeConverter->convertType(pascalReturnType);
     }
 
-    // Add function/procedure to the symbol table before entering its scope
+    // 在进入其作用域之前将函数/过程添加到符号表
     SymbolEntry entry;
     entry.name = name;
     entry.symbolType = isFunction ? SymbolType::FUNCTION : SymbolType::PROCEDURE;
     entry.dataType = pascalReturnType;
     symbolTable->addSymbol(entry);
 
-    // Create a new scope for the function/procedure
+    // 为函数/过程创建新的作用域
     symbolTable->enterScope(name);
 
-    // Output function/procedure declaration with return type and name
+    // 输出带有返回类型和名称的函数/过程声明
     output << returnType << " " << name;
 
-    // Visit formal parameters section
+    // 访问形式参数部分
     auto paramsResult = visit(context->formalParameter());
     std::string params = paramsResult.as<std::string>();
 
-    // In C, array parameters need proper pointer notation
-    // For array dimensions, first dimension is always empty in function parameters
+    // 在C中，数组参数需要适当的指针表示法
+    // 对于数组维度，在函数参数中第一维总是空的
     std::regex arrayPattern("\\[(\\d+)\\]");
     std::regex multiDimPattern("\\[(\\d+)\\](\\[\\d+\\])+");
 
-    // First find all multidimensional arrays and convert them properly
+    // 首先找到所有多维数组并正确转换
     std::smatch matches;
     std::string processedParams = params;
     std::string temp = processedParams;
@@ -693,19 +693,19 @@ antlrcpp::Any PascalToCTranslator::visitSubprogramHead(PascalSParser::Subprogram
     while (std::regex_search(temp, matches, multiDimPattern)) {
         std::string fullMatch = matches[0];
 
-        // Extract the position and replace with proper C array notation
-        // In C function parameters, first dimension is always empty: int[][10]
+        // 提取位置并替换为适当的C数组表示法
+        // 在C函数参数中，第一维总是空的：int[][10]
         size_t pos = processedParams.find(fullMatch);
         if (pos != std::string::npos) {
             std::string replacement = "[]" + fullMatch.substr(fullMatch.find("]") + 1);
             processedParams.replace(pos, fullMatch.length(), replacement);
         }
 
-        // Continue search from after the current match
+        // 从当前匹配之后继续搜索
         temp = matches.suffix().str();
     }
 
-    // Then handle single dimension arrays
+    // 然后处理单维数组
 //    processedParams = std::regex_replace(processedParams, arrayPattern, "[]");
 
     output << processedParams;
@@ -714,17 +714,17 @@ antlrcpp::Any PascalToCTranslator::visitSubprogramHead(PascalSParser::Subprogram
 }
 
 /**
- * Processes formal parameter declarations for functions and procedures
- * @param context The formal parameter context
- * @return String representation of parameter list in C syntax
+ * 处理函数和过程的形式参数声明
+ * @param context 形式参数上下文
+ * @return C语法中参数列表的字符串表示
  */
 antlrcpp::Any PascalToCTranslator::visitFormalParameter(PascalSParser::FormalParameterContext *context) {
-    // Default empty parameter list
+    // 默认空参数列表
     if (!context->parameterList()) {
         return antlrcpp::Any(std::string("()"));
     }
 
-    // Visit parameter list to generate parameter declarations
+    // 访问参数列表以生成参数声明
     auto result = visit(context->parameterList());
     std::string params = result.as<std::string>();
 
@@ -732,27 +732,27 @@ antlrcpp::Any PascalToCTranslator::visitFormalParameter(PascalSParser::FormalPar
 }
 
 /**
- * Processes a list of parameters
- * @param context The parameter list context
- * @return String representation of all parameters, comma-separated
+ * 处理参数列表
+ * @param context 参数列表上下文
+ * @return 所有参数的字符串表示，以逗号分隔
  */
 antlrcpp::Any PascalToCTranslator::visitParameterList(PascalSParser::ParameterListContext *context) {
     std::string paramList = "";
 
-    // First process the current parameter
+    // 首先处理当前参数
     auto result = visit(context->parameter());
     std::string param = result.as<std::string>();
 
     TranslatorUtils::logDebug("Processing parameter: " + param);
 
-    // Check if there are any nested parameters (which come earlier in the Pascal code)
+    // 检查是否有任何嵌套参数（在Pascal代码中较早出现）
     if (context->parameterList()) {
         auto moreParamsResult = visit(context->parameterList());
         std::string moreParamsStr = moreParamsResult.as<std::string>();
 
         TranslatorUtils::logDebug("Earlier parameters: " + moreParamsStr);
 
-        // Put the earlier parameters first in the list
+        // 将早期参数放在列表的前面
         if (!moreParamsStr.empty()) {
             if (param.empty()) paramList = moreParamsStr;
             else paramList = moreParamsStr + ", " + param;
@@ -761,7 +761,7 @@ antlrcpp::Any PascalToCTranslator::visitParameterList(PascalSParser::ParameterLi
             paramList = param;
         }
     } else {
-        // No nested parameters, just return the current one
+        // 没有嵌套参数，只返回当前参数
         paramList = param;
     }
 
@@ -769,9 +769,9 @@ antlrcpp::Any PascalToCTranslator::visitParameterList(PascalSParser::ParameterLi
 }
 
 /**
- * Processes a single parameter, which can be either by value or by reference (VAR)
- * @param context The parameter context
- * @return String representation of the parameter in C syntax
+ * 处理单个参数，可以是值参数或引用参数（VAR）
+ * @param context 参数上下文
+ * @return C语法中参数的字符串表示
  */
 antlrcpp::Any PascalToCTranslator::visitParameter(PascalSParser::ParameterContext *context) {
     if (context->varParameter()) {
@@ -786,22 +786,22 @@ antlrcpp::Any PascalToCTranslator::visitParameter(PascalSParser::ParameterContex
 }
 
 /**
- * Processes a VAR parameter (by reference)
- * In Pascal, VAR parameters are passed by reference
- * In C, this is implemented using pointers
- * @param context The VAR parameter context
- * @return String representation of the parameter in C syntax with pointer notation
+ * 处理VAR参数（通过引用）
+ * 在Pascal中，VAR参数通过引用传递
+ * 在C中，这通过指针实现
+ * @param context VAR参数上下文
+ * @return C语法中带指针表示法的参数的字符串表示
  */
 antlrcpp::Any PascalToCTranslator::visitVarParameter(PascalSParser::VarParameterContext *context) {
-    // Get value parameter string representation
+    // 获取值参数的字符串表示
     auto result = visit(context->valueParameter());
     std::string params = result.as<std::string>();
 
-    // Get identifiers from the context to mark them as reference parameters in the symbol table
+    // 从上下文中获取标识符，将它们标记为符号表中的引用参数
     auto idListResult = visit(context->valueParameter()->idList());
     std::vector<std::string> ids = idListResult.as<std::vector<std::string>>();
 
-    // Debug output to verify parameter identifiers
+    // 调试输出以验证参数标识符
     std::string idListStr;
     for (const auto &id: ids) {
         if (!idListStr.empty()) idListStr += ", ";
@@ -809,26 +809,26 @@ antlrcpp::Any PascalToCTranslator::visitVarParameter(PascalSParser::VarParameter
     }
     TranslatorUtils::logDebug("VAR parameter identifiers: " + idListStr);
 
-    // Also get type information to check for array types
+    // 同时获取类型信息以检查数组类型
     auto typeResult = visit(context->valueParameter()->type());
 
-    // Initialize variables for type information
+    // 初始化类型信息变量
     std::string typeStr;
     PascalType pascalType;
-    PascalType elementType = PascalType::INTEGER; // Default for arrays
+    PascalType elementType = PascalType::INTEGER; // 数组的默认类型
     std::vector<ArrayBounds> dimensions;
     bool isArray = false;
     bool isMultidimensionalArray = false;
 
-    // Extract type information based on whether it's an array or basic type
+    // 基于是基本类型还是数组类型提取类型信息
     try {
-        // Try to extract as a basic type first
+        // 首先尝试提取为基本类型
         auto typePair = typeResult.as<std::pair<std::string, PascalType>>();
         typeStr = typePair.first;
         pascalType = typePair.second;
         isArray = (pascalType == PascalType::ARRAY);
     } catch (const std::bad_cast &) {
-        // If it fails, it's an array type
+        // 如果失败，就是数组类型
         try {
             auto arrayTypeInfo = typeResult.as<std::tuple<std::string, PascalType, PascalType, std::vector<ArrayBounds>>>();
             typeStr = std::get<0>(arrayTypeInfo);
@@ -842,22 +842,22 @@ antlrcpp::Any PascalToCTranslator::visitVarParameter(PascalSParser::VarParameter
         }
     }
 
-    // Mark all parameters as reference parameters in symbol table
+    // 在符号表中将所有参数标记为引用参数
     for (const auto &id: ids) {
         if (symbolTable->hasSymbolInCurrentScope(id)) {
-            // Update the symbol in the symbol table
+            // 更新符号表中的符号
             SymbolEntry &entry = symbolTable->getSymbol(id);
             entry.isReference = true;
 
-            // Check if the parameter is an array
+            // 检查参数是否为数组
             bool isArray = (entry.dataType == PascalType::ARRAY);
             bool isMultidim = (isArray && entry.arrayDimensions.size() > 1);
             TranslatorUtils::logDebug("  Marking " + id + " as reference parameter, isArray: " +
                                       (isArray ? "true" : "false") +
                                       ", isMultidimensional: " + (isMultidim ? "true" : "false"));
 
-            // Since we already have addSymbol automatically adding parameters,
-            // we need to update the existing parameters in the scope's parameters list
+            // 由于我们已经有自动添加参数的addSymbol，
+            // 我们需要更新作用域的参数列表中的现有参数
             std::vector<SymbolEntry> &parameters = symbolTable->getCurrentScope().getParameters();
             for (auto &param: parameters) {
                 if (param.name == id) {
@@ -868,8 +868,8 @@ antlrcpp::Any PascalToCTranslator::visitVarParameter(PascalSParser::VarParameter
         }
     }
 
-    // Add pointer (*) for reference parameters to the type part of the declaration
-    // We need to handle multiple parameters in the chain
+    // 为引用参数在声明的类型部分添加指针(*)
+    // 我们需要处理链中的多个参数
     std::stringstream ss;
     std::string baseTypeStr;
     size_t pos = params.find_first_of(" ");
@@ -877,38 +877,38 @@ antlrcpp::Any PascalToCTranslator::visitVarParameter(PascalSParser::VarParameter
         baseTypeStr = params.substr(0, pos);
         std::string rest = params.substr(pos);
 
-        // Split the rest into individual parameter declarations
+        // 将剩余部分分割成单独的参数声明
         std::vector<std::string> paramDecls;
         size_t start = 0;
         size_t commaPos;
         while ((commaPos = rest.find(",", start)) != std::string::npos) {
             paramDecls.push_back(rest.substr(start, commaPos - start));
-            start = commaPos + 2; // Skip ", "
+            start = commaPos + 2; // 跳过", "
         }
         paramDecls.push_back(rest.substr(start));
 
-        // Extract the base type without array dimensions
+        // 提取不带数组维度的基本类型
         std::string baseType = baseTypeStr;
         size_t bracketPos = baseType.find('[');
         if (bracketPos != std::string::npos) {
             baseType = baseType.substr(0, bracketPos);
         }
 
-        // Check if we're dealing with a multidimensional array
+        // 检查我们是否在处理多维数组
         std::vector<std::string> dimensionSizes;
         if (isMultidimensionalArray) {
-            // Extract all dimension sizes for proper C array parameter declaration
+            // 提取所有维度大小，以便正确声明C数组参数
             for (const auto &dim: dimensions) {
                 int size = dim.upperBound - dim.lowerBound + 1 + 1;
                 dimensionSizes.push_back(std::to_string(size));
             }
         }
 
-        // Add pointer type to each parameter
+        // 为每个参数添加指针类型
         for (size_t i = 0; i < paramDecls.size(); ++i) {
             if (i > 0) ss << ", ";
 
-            // Get the parameter's variable name
+            // 获取参数的变量名
             size_t last_space_pos = paramDecls[i].rfind(' ');
             std::string paramName;
             if (last_space_pos != std::string::npos) {
@@ -917,29 +917,29 @@ antlrcpp::Any PascalToCTranslator::visitVarParameter(PascalSParser::VarParameter
                 paramName = paramDecls[i];
             }
 
-            // Handle based on whether it's an array parameter or not
+            // 根据是否为数组参数进行处理
             if (isArray) {
                 if (isMultidimensionalArray) {
-                    // For multidimensional arrays as parameters, use proper C syntax:
-                    // For a 2D array: type (*param)[dim2]
-                    // For a 3D array: type (*param)[dim2][dim3]
+                    // 对于多维数组作为参数，使用正确的C语法：
+                    // 对于2D数组：type (*param)[dim2]
+                    // 对于3D数组：type (*param)[dim2][dim3]
                     ss << baseType << " (*" << paramName << ")";
 
-                    // Add all dimensions except the first, which is omitted in C array parameters
+                    // 添加除第一维外的所有维度，在C数组参数中第一维总是省略的
                     for (size_t j = 1; j < dimensionSizes.size(); ++j) {
                         ss << "[" << dimensionSizes[j] << "]";
                     }
                 } else {
-                    // For single dimension arrays, we can use the simpler notation
+                    // 对于单维数组，我们可以使用更简单的表示法
                     ss << baseType << " *" << paramName;
                 }
             } else {
-                // Non-array parameter - regular pointer
+                // 非数组参数 - 常规指针
                 ss << baseType << "* " << paramName;
             }
         }
     } else {
-        // If we can't find a space, just add the pointer to the whole string
+        // 如果找不到空格，只需将指针添加到整个字符串
         ss << params << "*";
     }
 
@@ -947,16 +947,16 @@ antlrcpp::Any PascalToCTranslator::visitVarParameter(PascalSParser::VarParameter
 }
 
 /**
- * Processes a value parameter (by value)
- * In Pascal, regular parameters are passed by value
- * @param context The value parameter context
- * @return String representation of the parameter in C syntax
+ * 处理值参数（按值传递）
+ * 在Pascal中，常规参数按值传递
+ * @param context 值参数上下文
+ * @return C语法中参数的字符串表示
  */
 antlrcpp::Any PascalToCTranslator::visitValueParameter(PascalSParser::ValueParameterContext *context) {
-    // Get identifiers
+    // 获取标识符
     std::vector<std::string> ids = visit(context->idList()).as<std::vector<std::string>>();
 
-    // Debug output for parameter identifiers
+    // 参数标识符的调试输出
     std::string idListStr;
     for (const auto &id: ids) {
         if (!idListStr.empty()) idListStr += ", ";
@@ -964,23 +964,23 @@ antlrcpp::Any PascalToCTranslator::visitValueParameter(PascalSParser::ValueParam
     }
     TranslatorUtils::logDebug("Value parameter identifiers: " + idListStr);
 
-    // Get type information
+    // 获取类型信息
     auto typeResult = visit(context->type());
 
-    // Initialize variables for type information
+    // 初始化类型信息变量
     std::string typeStr;
     PascalType pascalType;
-    PascalType elementType = PascalType::INTEGER; // Default for arrays
+    PascalType elementType = PascalType::INTEGER; // 数组的默认类型
     std::vector<ArrayBounds> dimensions;
 
-    // Extract type information based on whether it's an array or basic type
+    // 基于是基本类型还是数组类型提取类型信息
     try {
-        // Try to extract as a basic type first
+        // 首先尝试提取为基本类型
         auto typePair = typeResult.as<std::pair<std::string, PascalType>>();
         typeStr = typePair.first;
         pascalType = typePair.second;
     } catch (const std::bad_cast &) {
-        // If it fails, it's an array type
+        // 如果失败，就是数组类型
         try {
             auto arrayTypeInfo = typeResult.as<std::tuple<std::string, PascalType, PascalType, std::vector<ArrayBounds>>>();
             typeStr = std::get<0>(arrayTypeInfo);
@@ -992,7 +992,7 @@ antlrcpp::Any PascalToCTranslator::visitValueParameter(PascalSParser::ValueParam
         }
     }
 
-    // Format parameters
+    // 格式化参数
     std::stringstream ss;
     for (size_t i = 0; i < ids.size(); ++i) {
         if (i > 0) {
@@ -1007,14 +1007,14 @@ antlrcpp::Any PascalToCTranslator::visitValueParameter(PascalSParser::ValueParam
                                                   (pascalType == PascalType::BOOLEAN ? "BOOLEAN" :
                                                    (pascalType == PascalType::CHAR ? "CHAR" : "UNKNOWN"))))));
 
-        // Add parameter to symbol table
+        // 添加参数到符号表
         SymbolEntry entry;
         entry.name = ids[i];
         entry.symbolType = SymbolType::PARAMETER;
         entry.dataType = pascalType;
-        entry.isReference = false;  // Default is by value, will be updated if VAR parameter
+        entry.isReference = false;  // 默认按值传递，如果是VAR参数将被更新
 
-        // Store array-specific information if needed
+        // 如果需要，存储数组特定信息
         if (pascalType == PascalType::ARRAY) {
             entry.arrayElementType = elementType;
             entry.arrayDimensions = dimensions;
@@ -1032,75 +1032,75 @@ antlrcpp::Any PascalToCTranslator::visitValueParameter(PascalSParser::ValueParam
 }
 
 /**
- * Processes a subprogram body which contains declarations and statements
- * @param context The subprogram body context
- * @return Standard placeholder for visitor pattern
+ * 处理子程序主体，包含声明和语句
+ * @param context 子程序主体上下文
+ * @return 访问者模式的标准占位符
  */
 antlrcpp::Any PascalToCTranslator::visitSubprogramBody(PascalSParser::SubprogramBodyContext *context) {
-    // Process constant declarations if present
+    // 如果存在，处理常量声明
     if (context->constDeclarations()) {
         visit(context->constDeclarations());
     }
 
-    // Process variable declarations if present
+    // 如果存在，处理变量声明
     if (context->varDeclarations()) {
         visit(context->varDeclarations());
     }
 
-    // Process compound statement (main body of the function/procedure)
+    // 处理复合语句（函数/过程的主体）
     if (context->compoundStatement()) {
         visit(context->compoundStatement());
     }
 
-    // Exit the scope at the end of the subprogram
+    // 在子程序结束时退出作用域
     symbolTable->exitScope();
 
     return antlrcpp::Any();
 }
 
 /**
- * Processes a compound statement (BEGIN ... END block)
- * @param context The compound statement context
- * @return Standard placeholder for visitor pattern
+ * 处理复合语句（BEGIN ... END块）
+ * @param context 复合语句上下文
+ * @return 访问者模式的标准占位符
  */
 antlrcpp::Any PascalToCTranslator::visitCompoundStatement(PascalSParser::CompoundStatementContext *context) {
-    // Skip BEGIN and END tokens, just visit the statement list inside
+    // 跳过BEGIN和END标记，只访问内部的语句列表
     visit(context->statementList());
 
     return antlrcpp::Any();
 }
 
 /**
- * Processes a list of statements
- * @param context The statement list context
- * @return Standard placeholder for visitor pattern
+ * 处理语句列表
+ * @param context 语句列表上下文
+ * @return 访问者模式的标准占位符
  */
 antlrcpp::Any PascalToCTranslator::visitStatementList(PascalSParser::StatementListContext *context) {
-    // Visit additional statements first if any (earlier in source)
+    // 如果有任何早期语句，首先访问它们（在源码中较早出现）
     if (context->statementList()) {
         visit(context->statementList());
     }
 
-    // Visit the current statement (later in source)
+    // 访问当前语句（在源码中较晚出现）
     visit(context->statement());
 
     return antlrcpp::Any();
 }
 
 /**
- * Processes individual statements (assignment, procedure call, if, for, etc.)
- * @param context The statement context
- * @return Standard placeholder for visitor pattern
+ * 处理单个语句（赋值、过程调用、if、for等）
+ * @param context 语句上下文
+ * @return 访问者模式的标准占位符
  */
 antlrcpp::Any PascalToCTranslator::visitStatement(PascalSParser::StatementContext *context) {
-    // Empty statement
+    // 空语句
     if (!context->variable() && !context->ID() && !context->procedureCall() && !context->compoundStatement() &&
         !context->ifStatement() && !context->forStatement() && !context->readStatement() &&
         !context->whileStatement() && !context->writeStatement() && !context->breakStatement()) {
         return antlrcpp::Any();
     }
 
-    // Assignment to identifier (procedure or function result)
+    // 向标识符赋值（过程或函数结果）
     if (context->ID() && context->ASSIGNOP()) {
         std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
         if (!symbolTable->hasSymbol(id)) {
@@ -1113,43 +1113,43 @@ antlrcpp::Any PascalToCTranslator::visitStatement(PascalSParser::StatementContex
         auto exprResult = visit(context->expression());
         std::string expr = exprResult.as<std::string>();
 
-        // Get current scope name - if we're assigning to a function with the same name, it's a return value assignment
+        // 获取当前作用域名称 - 如果我们向与当前函数同名的标识符赋值，那是一个返回值赋值
         std::string currentScopeName = symbolTable->getCurrentScope().getScopeName();
 
         if (currentScopeName == id) {
-            // This is a function result assignment (Pascal function:=value)
-            // Assign to the function's tmp variable instead of the function name directly
+            // 这是一个函数结果赋值（Pascal function:=value）
+            // 赋值给函数的tmp变量而不是直接使用函数名
             output << getCurrentIndentation() << id << "tmp = " << expr << ";\n";
         } else {
-            // Regular assignment to an identifier
+            // 向普通标识符赋值
             output << getCurrentIndentation() << id << " = " << expr << ";\n";
         }
     }
-        // Assignment to variable (can be array element or another complex variable)
+        // 向变量赋值（可以是数组元素或其他复杂变量）
     else if (context->variable() && context->ASSIGNOP()) {
         auto varResult = visit(context->variable());
 
-        // Check if this is a function result assignment
+        // 检查这是否是函数结果赋值
         try {
             if (varResult.is<std::pair<std::string, std::string>>()) {
                 auto pair = varResult.as<std::pair<std::string, std::string>>();
                 if (pair.first == "FUNCTION_RESULT") {
-                    // This is a function result assignment (Pascal function:=value)
+                    // 这是一个函数结果赋值（Pascal function:=value）
                     auto exprResult = visit(context->expression());
                     std::string expr = exprResult.as<std::string>();
 
-                    // Assign to the function's tmp variable instead of returning directly
+                    // 赋值给函数的tmp变量而不是直接返回
                     output << getCurrentIndentation() << pair.second << "tmp = " << expr << ";\n";
                     return antlrcpp::Any();
                 }
             }
         } catch (const std::bad_cast &e) {
-            // If there's a cast error, assume it's a regular variable assignment
+            // 如果有类型转换错误，假设它是常规变量赋值
             TranslatorUtils::logError(
                     "Warning: Type conversion issue in variable assignment: " + std::string(e.what()));
         }
 
-        // Regular variable assignment - try with explicit string cast
+        // 常规变量赋值 - 尝试使用显式字符串转换
         try {
             std::string var = varResult.as<std::string>();
             auto exprResult = visit(context->expression());
@@ -1157,42 +1157,42 @@ antlrcpp::Any PascalToCTranslator::visitStatement(PascalSParser::StatementContex
 
             output << getCurrentIndentation() << var << " = " << expr << ";\n";
         } catch (const std::bad_cast &e) {
-            // If cast fails again, add error handling
+            // 如果转换再次失败，添加错误处理
             TranslatorUtils::logError("Error in variable assignment: " + std::string(e.what()));
         }
     }
-        // Procedure call
+        // 过程调用
     else if (context->procedureCall()) {
         auto result = visit(context->procedureCall());
         std::string call = result.as<std::string>();
 
         output << getCurrentIndentation() << call << ";\n";
     }
-        // Compound statement (BEGIN ... END block)
+        // 复合语句（BEGIN ... END块）
     else if (context->compoundStatement()) {
         visit(context->compoundStatement());
     }
-        // If statement
+        // If语句
     else if (context->ifStatement()) {
         visit(context->ifStatement());
     }
-        // For statement
+        // For语句
     else if (context->forStatement()) {
         visit(context->forStatement());
     }
-        // Read statement
+        // Read语句
     else if (context->readStatement()) {
         visit(context->readStatement());
     }
-        // While statement
+        // While语句
     else if (context->whileStatement()) {
         visit(context->whileStatement());
     }
-        // Write statement
+        // Write语句
     else if (context->writeStatement()) {
         visit(context->writeStatement());
     }
-        // Break statement
+        // Break语句
     else if (context->breakStatement()) {
         visit(context->breakStatement());
     }
@@ -1201,26 +1201,26 @@ antlrcpp::Any PascalToCTranslator::visitStatement(PascalSParser::StatementContex
 }
 
 /**
- * Processes an if statement and optional else part
- * @param context The if statement context
- * @return Standard placeholder for visitor pattern
+ * 处理if语句和可选的else部分
+ * @param context if语句上下文
+ * @return 访问者模式的标准占位符
  */
 antlrcpp::Any PascalToCTranslator::visitIfStatement(PascalSParser::IfStatementContext *context) {
-    // Get the condition expression
+    // 获取条件表达式
     auto condResult = visit(context->expression());
     std::string cond = condResult.as<std::string>();
 
-    // Output if statement with condition
+    // 输出带有条件的if语句
     output << getCurrentIndentation() << "if (" << cond << ") {\n";
     increaseIndentation();
 
-    // Visit the if-branch statement
+    // 访问if分支语句
     visit(context->statement());
 
     decreaseIndentation();
     output << getCurrentIndentation() << "}";
 
-    // Visit else part if present
+    // 如果存在，访问else部分
     if (context->elsePart()) {
         output << " else {\n";
         increaseIndentation();
@@ -1237,23 +1237,23 @@ antlrcpp::Any PascalToCTranslator::visitIfStatement(PascalSParser::IfStatementCo
 }
 
 /**
- * Processes a for statement (loop with counter)
- * @param context The for statement context
- * @return Standard placeholder for visitor pattern
+ * 处理for语句（带计数器的循环）
+ * @param context for语句上下文
+ * @return 访问者模式的标准占位符
  */
 antlrcpp::Any PascalToCTranslator::visitForStatement(PascalSParser::ForStatementContext *context) {
-    // Get loop counter variable
+    // 获取循环计数器变量
     std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
 
-    // Get initial value
+    // 获取初始值
     auto initResult = visit(context->expression(0));
     std::string init = initResult.as<std::string>();
 
-    // Get final value
+    // 获取最终值
     auto finalResult = visit(context->expression(1));
     std::string final = finalResult.as<std::string>();
 
-    // Output C-style for loop (Pascal for-loops are always incrementing by 1)
+    // 输出C风格的for循环（Pascal的for循环总是以1递增）
     output << getCurrentIndentation() << "for (" << id << " = " << init << "; " << id << " <= " << final << "; ++" << id
            << ") {\n";
     increaseIndentation();
@@ -1268,10 +1268,10 @@ antlrcpp::Any PascalToCTranslator::visitForStatement(PascalSParser::ForStatement
 }
 
 /**
- * Processes a read statement (input)
- * Translates to scanf calls in C
- * @param context The read statement context
- * @return Standard placeholder for visitor pattern
+ * 处理read语句（输入）
+ * 翻译为C中的scanf调用
+ * @param context read语句上下文
+ * @return 访问者模式的标准占位符
  */
 antlrcpp::Any PascalToCTranslator::visitReadStatement(PascalSParser::ReadStatementContext *context) {
     try {
@@ -1359,9 +1359,9 @@ antlrcpp::Any PascalToCTranslator::visitReadStatement(PascalSParser::ReadStateme
 }
 
 /**
- * Processes a while statement (loop with condition)
- * @param context The while statement context
- * @return Standard placeholder for visitor pattern
+ * 处理while语句（带条件的循环）
+ * @param context while语句上下文
+ * @return 访问者模式的标准占位符
  */
 antlrcpp::Any PascalToCTranslator::visitWhileStatement(PascalSParser::WhileStatementContext *context) {
     // Get the loop condition
@@ -1382,10 +1382,10 @@ antlrcpp::Any PascalToCTranslator::visitWhileStatement(PascalSParser::WhileState
 }
 
 /**
- * Processes a write statement (output)
- * Translates to printf calls in C
- * @param context The write statement context
- * @return Standard placeholder for visitor pattern
+ * 处理write语句（输出）
+ * 翻译为C中的printf调用
+ * @param context write语句上下文
+ * @return 访问者模式的标准占位符
  */
 antlrcpp::Any PascalToCTranslator::visitWriteStatement(PascalSParser::WriteStatementContext *context) {
     auto result = visit(context->expressionList());
@@ -1520,6 +1520,11 @@ antlrcpp::Any PascalToCTranslator::visitWriteStatement(PascalSParser::WriteState
     return antlrcpp::Any();
 }
 
+/**
+ * 处理break语句
+ * @param context break语句上下文
+ * @return 访问者模式的标准占位符
+ */
 antlrcpp::Any PascalToCTranslator::visitBreakStatement(PascalSParser::BreakStatementContext *context) {
     output << getCurrentIndentation() << "break;\n";
     return antlrcpp::Any();
@@ -1527,9 +1532,9 @@ antlrcpp::Any PascalToCTranslator::visitBreakStatement(PascalSParser::BreakState
 
 
 /**
- * Processes a list of variables for input/output or other operations
- * @param context The variable list context
- * @return Vector of string representations of variables in C syntax
+ * 处理用于输入/输出或其他操作的变量列表
+ * @param context 变量列表上下文
+ * @return C语法中变量字符串表示的向量
  */
 antlrcpp::Any PascalToCTranslator::visitVariableList(PascalSParser::VariableListContext *context) {
     std::vector<std::string> vars;
@@ -1561,32 +1566,32 @@ antlrcpp::Any PascalToCTranslator::visitVariableList(PascalSParser::VariableList
 }
 
 /**
- * Processes a variable identifier, which could be a simple variable or array element
- * Handles special cases like function result variables and reference parameters
- * @param context The variable context
- * @return String representation of the variable in C syntax or a special marker for function results
+ * 处理变量标识符，可以是简单变量或数组元素
+ * 处理特殊情况，如函数结果变量和引用参数
+ * @param context 变量上下文
+ * @return C语法中变量的字符串表示或函数结果的特殊标记
  */
 antlrcpp::Any PascalToCTranslator::visitVariable(PascalSParser::VariableContext *context) {
     std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
 
-    // Check if the variable is a function name in the current scope
+    // 检查变量是否是当前作用域中的函数名
     std::string currentScopeName = symbolTable->getCurrentScope().getScopeName();
 
-    // Check if we're in a function and the variable name matches the function name
+    // 检查我们是否在一个函数中，且变量名与函数名匹配
     if (id == currentScopeName) {
-        // For a function return value, return a special pair to indicate this
-        // We'll handle this in visitStatement
+        // 对于函数返回值，返回一个特殊的对来表示这一点
+        // 我们将在visitStatement中处理这个情况
         std::pair<std::string, std::string> resultPair("FUNCTION_RESULT", id);
         return resultPair;
     }
 
-    // Check if the variable is a reference parameter (not a local variable)
+    // 检查变量是否为引用参数（不是局部变量）
     bool isReferenceParam = false;
     bool isArray = false;
 
     if (symbolTable->hasSymbol(id)) {
         const SymbolEntry &entry = symbolTable->getSymbol(id);
-        // Only consider as reference parameter if it's actually a parameter and marked as reference
+        // 仅当它实际上是一个参数且标记为引用时才视为引用参数
         isReferenceParam = entry.isReference && entry.symbolType == SymbolType::PARAMETER;
         isArray = (entry.dataType == PascalType::ARRAY);
     } else {
@@ -1596,23 +1601,23 @@ antlrcpp::Any PascalToCTranslator::visitVariable(PascalSParser::VariableContext 
         std::cout << "----------------------------------------------------------" << std::endl;
     }
 
-    // Check if it's an array access
+    // 检查是否是数组访问
     std::string result;
     if (context->idVarPart()) {
         auto partResult = visit(context->idVarPart());
         std::string indices = partResult.as<std::string>();
 
-        // Only dereference reference parameters (not local variables) when they're used within the function they were passed to
+        // 只有当引用参数（不是局部变量）在被传递到的函数内部使用时才解引用
         if (isReferenceParam && !isArray && symbolTable->hasSymbolInCurrentScope(id)) {
-            // For non-array reference parameters, we need to dereference when accessing
+            // 对于非数组引用参数，在访问时需要解引用
             result = "(*" + id + ")" + indices;
         } else {
             result = id + indices;
         }
     } else {
-        // Not an array access
+        // 不是数组访问
         if (isReferenceParam && !isArray && symbolTable->hasSymbolInCurrentScope(id)) {
-            // For non-array reference parameters, we need to dereference
+            // 对于非数组引用参数，需要解引用
             result = "(*" + id + ")";
         } else {
             result = id;
@@ -1623,21 +1628,21 @@ antlrcpp::Any PascalToCTranslator::visitVariable(PascalSParser::VariableContext 
 }
 
 /**
- * Processes array indexing expressions for a variable
- * @param context The ID variable part context (array indexing)
- * @return String representation of the array indices in C syntax
+ * 处理变量的数组索引表达式
+ * @param context ID变量部分上下文（数组索引）
+ * @return C语法中数组索引的字符串表示
  */
 antlrcpp::Any PascalToCTranslator::visitIdVarPart(PascalSParser::IdVarPartContext *context) {
-    // Empty array access
+    // 空数组访问
     if (!context->expressionList()) {
         return antlrcpp::Any(std::string(""));
     }
 
-    // Get array indices from expression list
+    // 从表达式列表获取数组索引
     auto result = visit(context->expressionList());
     std::vector<std::string> indices = result.as<std::vector<std::string>>();
 
-    // Format array access with C-style indexing
+    // 使用C风格的索引格式化数组访问
     std::stringstream ss;
     for (const auto &index: indices) {
         ss << "[" << index << "]";
@@ -1647,33 +1652,33 @@ antlrcpp::Any PascalToCTranslator::visitIdVarPart(PascalSParser::IdVarPartContex
 }
 
 /**
- * Processes a procedure call statement
- * @param context The procedure call context
- * @return String representation of the procedure call in C syntax
+ * 处理过程调用语句
+ * @param context 过程调用上下文
+ * @return C语法中过程调用的字符串表示
  */
 antlrcpp::Any PascalToCTranslator::visitProcedureCall(PascalSParser::ProcedureCallContext *context) {
     std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
 
-    // Check if it's a procedure call with arguments
+    // 检查是否是带参数的过程调用
     if (context->expressionList()) {
         auto result = visit(context->expressionList());
         std::vector<std::string> args = result.as<std::vector<std::string>>();
 
-        // Format procedure call with arguments
+        // 格式化带参数的过程调用
         std::stringstream ss;
         ss << id << "(";
 
-        // Get procedure definition if available to check for reference parameters
+        // 获取过程定义（如果可用）以检查引用参数
         bool hasProcedureSymbol = symbolTable->hasSymbol(id);
         std::vector<SymbolEntry> parameters;
 
         if (hasProcedureSymbol) {
-            // Get the parameters for this procedure
+            // 获取此过程的参数
             if (symbolTable->hasScope(id)) {
                 const ScopeEntry &scope = symbolTable->getScope(id);
                 parameters = scope.getParameters();
 
-                // Debug output to verify parameters
+                // 调试输出以验证参数
                 TranslatorUtils::logDebug("Procedure " + id + " parameters:");
                 for (size_t i = 0; i < parameters.size(); ++i) {
                     TranslatorUtils::logDebug("  Param " + std::to_string(i) + ": " + parameters[i].name +
@@ -1687,38 +1692,38 @@ antlrcpp::Any PascalToCTranslator::visitProcedureCall(PascalSParser::ProcedureCa
                 ss << ", ";
             }
 
-            // Check if this parameter should be passed by reference
+            // 检查此参数是否应通过引用传递
             bool isReferenceParam = false;
             bool isArrayType = false;
             bool isMultidimensionalArray = false;
 
-            // Fix parameter ordering issue: The parameters in the scope's parameters list are
-            // stored in reverse order compared to how they appear in Pascal source.
-            // So need to reverse the index to match the correct parameter.
+            // 修复参数排序问题：作用域参数列表中的参数
+            // 与它们在Pascal源代码中出现的顺序相比是相反的。
+            // 因此需要反转索引以匹配正确的参数。
             if (parameters.size() == args.size()) {
-                // Calculate the correct parameter index (parameters are in reverse order)
+                // 计算正确的参数索引（参数顺序相反）
                 size_t paramIndex = parameters.size() - 1 - i;
 
                 isReferenceParam = parameters[paramIndex].isReference;
 
-                // Debug output to verify reference parameter detection
+                // 调试输出以验证引用参数检测
                 TranslatorUtils::logDebug("  Checking arg " + std::to_string(i) + ": " + args[i] +
                                           ", isRef: " + (isReferenceParam ? "true" : "false") +
                                           ", paramIndex: " + std::to_string(paramIndex));
 
-                // Check if the argument is an array
+                // 检查参数是否为数组
                 std::string argBase = args[i];
                 size_t bracketPos = argBase.find('[');
                 size_t parenPos = argBase.find('(');
 
-                // Extract base variable name if it has array indexing or function call
+                // 如果有数组索引或函数调用，提取基本变量名
                 if (bracketPos != std::string::npos) {
                     argBase = argBase.substr(0, bracketPos);
                 } else if (parenPos != std::string::npos) {
                     argBase = argBase.substr(0, parenPos);
                 }
 
-                // Check if the argument is an array and if it's multidimensional
+                // 检查参数是否为数组以及是否为多维数组
                 if (symbolTable->hasSymbol(argBase)) {
                     const SymbolEntry &argEntry = symbolTable->getSymbol(argBase);
                     isArrayType = (argEntry.dataType == PascalType::ARRAY);
@@ -1729,11 +1734,11 @@ antlrcpp::Any PascalToCTranslator::visitProcedureCall(PascalSParser::ProcedureCa
                                               ", dimensions: " + std::to_string(argEntry.arrayDimensions.size()));
                 }
 
-                // Handle regular arrays and multidimensional arrays differently
+                // 区别处理常规数组和多维数组
                 if (isArrayType) {
-                    // If it's an array indexing operation, we need to check if we're passing a slice of the array
+                    // 如果是数组索引操作，我们需要检查是否传递的是数组的一部分
                     if (args[i].find('[') != std::string::npos) {
-                        // Count the number of dimensions in the original array vs. the array access
+                        // 计算原始数组与数组访问中的维度数
                         int accessedDimensions = 0;
                         size_t pos = 0;
                         while ((pos = args[i].find('[', pos)) != std::string::npos) {
@@ -1741,19 +1746,18 @@ antlrcpp::Any PascalToCTranslator::visitProcedureCall(PascalSParser::ProcedureCa
                             pos++;
                         }
 
-                        // If using the parameter as an array, check dimensions
                         bool isFullyIndexed = false;
                         if (symbolTable->hasSymbol(argBase)) {
                             const SymbolEntry &argEntry = symbolTable->getSymbol(argBase);
                             isFullyIndexed = (accessedDimensions >= argEntry.arrayDimensions.size());
                         }
 
-                        // If we're passing a slice or the parameter expects an array
+                        // 如果我们传递的是一部分或参数需要一个数组
                         if (!isFullyIndexed) {
-                            // Pass the array element directly (it's a slice of the multidimensional array)
+                            // 直接传递数组元素（它是多维数组的一部分）
                             ss << args[i];
                         } else {
-                            // Pass the fully indexed element (might need & if it's a VAR parameter)
+                            // 传递完全索引的元素（如果是VAR参数可能需要使用&）
                             if (isReferenceParam) {
                                 ss << "(&(" << args[i] << "))";
                             } else {
@@ -1761,21 +1765,21 @@ antlrcpp::Any PascalToCTranslator::visitProcedureCall(PascalSParser::ProcedureCa
                             }
                         }
                     } else {
-                        // Passing the whole array - no & needed as arrays are passed by reference by default
+                        // 传递整个数组 - 不需要使用&，因为数组默认按引用传递
                         ss << args[i];
                     }
                 }
-                    // For non-array parameters that are passed by reference
+                    // 对于通过引用传递的非数组参数
                 else if (isReferenceParam) {
                     ss << "(&(" << args[i] << "))";
                     TranslatorUtils::logDebug("  Adding & to " + args[i]);
                 } else {
-                    // Regular value parameter
+                    // 常规值参数
                     ss << args[i];
                 }
                 std::cout << "arg :" << args[i] << std::endl;
             } else {
-                // If we can't match parameters, just pass the argument as-is
+                // 如果我们无法匹配参数，则按原样传递参数
                 ss << args[i];
                 std::cout << "can't match parameters, arg :" << args[i] << std::endl;
             }
@@ -1786,47 +1790,47 @@ antlrcpp::Any PascalToCTranslator::visitProcedureCall(PascalSParser::ProcedureCa
         return ss.str();
     }
 
-    // Procedure call without arguments
+    // 无参数的过程调用
     return id + "()";
 }
 
 /**
- * Processes the else part of an if statement
- * @param context The else part context
- * @return String representation of "else" (for consistency in visitor pattern)
+ * 处理if语句的else部分
+ * @param context else部分上下文
+ * @return "else"的字符串表示（为了访问者模式的一致性）
  */
 antlrcpp::Any PascalToCTranslator::visitElsePart(PascalSParser::ElsePartContext *context) {
-    // Empty else part
+    // 空的else部分
     if (!context->statement()) {
         return antlrcpp::Any(std::string(""));
     }
 
-    // Visit else statement
+    // 访问else语句
     visit(context->statement());
 
     return antlrcpp::Any(std::string("else"));
 }
 
 /**
- * Processes a list of expressions for function/procedure arguments or array indices
- * @param context The expression list context
- * @return Vector of string representations of expressions in C syntax
+ * 处理函数/过程参数或数组索引的表达式列表
+ * @param context 表达式列表上下文
+ * @return C语法中表达式的字符串表示向量
  */
 antlrcpp::Any PascalToCTranslator::visitExpressionList(PascalSParser::ExpressionListContext *context) {
     std::vector<std::string> exprs;
 
     try {
-        // In Pascal, expressions in a list appear from left to right in the source code,
-        // but the ANTLR parser processes them in a way that the rightmost expression becomes
-        // the current node and earlier expressions are in the nested expressionList.
+        // 在Pascal中，列表中的表达式从左到右出现在源代码中，
+        // 但ANTLR解析器处理它们的方式是，最右边的表达式成为
+        // 当前节点，而较早的表达式在嵌套的expressionList中。
 
-        // First, process any earlier expressions in the nested expressionList
+        // 首先，处理嵌套expressionList中更早出现的表达式
         if (context->expressionList()) {
             auto earlierExprs = visit(context->expressionList());
             exprs = earlierExprs.as<std::vector<std::string>>();
         }
 
-        // Then add the current expression, which comes later in the source
+        // 然后添加当前表达式，它在源代码中出现较晚
         auto result = visit(context->expression());
         exprs.push_back(result.as<std::string>());
     } catch (const std::bad_cast &e) {
@@ -1837,17 +1841,17 @@ antlrcpp::Any PascalToCTranslator::visitExpressionList(PascalSParser::Expression
 }
 
 /**
- * Processes an expression which can be a simple expression or a relational expression
- * @param context The expression context
- * @return String representation of the expression in C syntax
+ * 处理可以是简单表达式或关系表达式的表达式
+ * @param context 表达式上下文
+ * @return C语法中表达式的字符串表示
  */
 antlrcpp::Any PascalToCTranslator::visitExpression(PascalSParser::ExpressionContext *context) {
-    // Simple expression (no relational operator)
+    // 简单表达式（没有关系运算符）
     if (!context->relop()) {
         return visit(context->simpleExpression(0));
     }
 
-    // Relational expression (with comparison operator)
+    // 关系表达式（带比较运算符）
     auto leftResult = visit(context->simpleExpression(0));
     std::string left = leftResult.as<std::string>();
 
@@ -1857,7 +1861,7 @@ antlrcpp::Any PascalToCTranslator::visitExpression(PascalSParser::ExpressionCont
     auto rightResult = visit(context->simpleExpression(1));
     std::string right = rightResult.as<std::string>();
 
-    // Check if the left or right operands are function names that should use their tmp variables
+    // 检查左操作数或右操作数是否为应使用其tmp变量的函数名
     std::string currentScopeName = symbolTable->getCurrentScope().getScopeName();
     if (left == currentScopeName) {
         left = left + "tmp";
@@ -1866,23 +1870,23 @@ antlrcpp::Any PascalToCTranslator::visitExpression(PascalSParser::ExpressionCont
         right = right + "tmp";
     }
 
-    // Parenthesize the comparison for safety
+    // 将比较用括号括起来以确保安全
     std::string result = "(" + left + " " + op + " " + right + ")";
     return antlrcpp::Any(result);
 }
 
 /**
- * Processes a simple expression which can be a term or additive expressions
- * @param context The simple expression context
- * @return String representation of the simple expression in C syntax
+ * 处理可以是项或加法表达式的简单表达式
+ * @param context 简单表达式上下文
+ * @return C语法中简单表达式的字符串表示
  */
 antlrcpp::Any PascalToCTranslator::visitSimpleExpression(PascalSParser::SimpleExpressionContext *context) {
-    // Single term (no additive operator)
+    // 单个项（没有加法运算符）
     if (!context->addop()) {
         return visit(context->term());
     }
 
-    // Expression with additive operator (+ - OR)
+    // 带加法运算符的表达式（+ - OR）
     auto leftResult = visit(context->simpleExpression());
     std::string left = leftResult.as<std::string>();
 
@@ -1892,7 +1896,7 @@ antlrcpp::Any PascalToCTranslator::visitSimpleExpression(PascalSParser::SimpleEx
     auto rightResult = visit(context->term());
     std::string right = rightResult.as<std::string>();
 
-    // Check if the left or right operands are function names that should use their tmp variables
+    // 检查左操作数或右操作数是否为应使用其tmp变量的函数名
     std::string currentScopeName = symbolTable->getCurrentScope().getScopeName();
     if (left == currentScopeName) {
         left = left + "tmp";
@@ -1901,22 +1905,22 @@ antlrcpp::Any PascalToCTranslator::visitSimpleExpression(PascalSParser::SimpleEx
         right = right + "tmp";
     }
 
-    // Parenthesize the expression for correct precedence
+    // 将表达式用括号括起来以确保正确的优先级
     return antlrcpp::Any(std::string("(") + left + " " + op + " " + right + ")");
 }
 
 /**
- * Processes a term which can be a factor or multiplicative expressions
- * @param context The term context
- * @return String representation of the term in C syntax
+ * 处理可以是因子或乘法表达式的项
+ * @param context 项上下文
+ * @return C语法中项的字符串表示
  */
 antlrcpp::Any PascalToCTranslator::visitTerm(PascalSParser::TermContext *context) {
-    // Single factor (no multiplicative operator)
+    // 单个因子（没有乘法运算符）
     if (!context->mulop()) {
         return visit(context->factor());
     }
 
-    // Term with multiplicative operator (* / DIV MOD AND)
+    // 带乘法运算符的项（* / DIV MOD AND）
     auto leftResult = visit(context->term());
     std::string left = leftResult.as<std::string>();
 
@@ -1926,7 +1930,7 @@ antlrcpp::Any PascalToCTranslator::visitTerm(PascalSParser::TermContext *context
     auto rightResult = visit(context->factor());
     std::string right = rightResult.as<std::string>();
 
-    // Check if the left or right operands are function names that should use their tmp variables
+    // 检查左操作数或右操作数是否为应使用其tmp变量的函数名
     std::string currentScopeName = symbolTable->getCurrentScope().getScopeName();
     if (left == currentScopeName) {
         left = left + "tmp";
@@ -1935,32 +1939,32 @@ antlrcpp::Any PascalToCTranslator::visitTerm(PascalSParser::TermContext *context
         right = right + "tmp";
     }
 
-    // Parenthesize the expression for correct precedence
+    // 将表达式用括号括起来以确保正确的优先级
     return antlrcpp::Any(std::string("(") + left + " " + op + " " + right + ")");
 }
 
 /**
- * Processes a factor, which can be a constant, variable, expression, function call, or unary operation
- * @param context The factor context
- * @return String representation of the factor in C syntax
+ * 处理因子，可以是常量、变量、表达式、函数调用或一元操作
+ * @param context 因子上下文
+ * @return C语法中因子的字符串表示
  */
 antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *context) {
-    // Number literal
+    // 数字字面量
     if (context->num()) {
         return visit(context->num());
     }
-        // Variable (can be simple variable or array element)
+        // 变量（可以是简单变量或数组元素）
     else if (context->variable()) {
         return visit(context->variable());
     }
-        // Parenthesized expression
+        // 带括号的表达式
     else if (context->LPAREN() && context->expression()) {
         auto result = visit(context->expression());
         std::string expr = result.as<std::string>();
 
         return antlrcpp::Any(std::string("(") + expr + ")");
     }
-        // Function call
+        // 函数调用
     else if (context->ID() && context->expressionList()) {
         std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
 
@@ -1975,21 +1979,21 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
         auto result = visit(context->expressionList());
         std::vector<std::string> args = result.as<std::vector<std::string>>();
 
-        // Format function call
+        // 格式化函数调用
         std::stringstream ss;
         ss << id << "(";
 
-        // Get function definition if available to check for reference parameters
+        // 获取函数定义（如果可用）以检查引用参数
         bool hasFunctionSymbol = symbolTable->hasSymbol(id);
         std::vector<SymbolEntry> parameters;
 
         if (hasFunctionSymbol) {
-            // Get the parameters for this function
+            // 获取此函数的参数
             if (symbolTable->hasScope(id)) {
                 const ScopeEntry &scope = symbolTable->getScope(id);
                 parameters = scope.getParameters();
 
-                // Debug output to verify parameters
+                // 调试输出以验证参数
                 TranslatorUtils::logDebug("Function " + id + " parameters:");
                 for (size_t i = 0; i < parameters.size(); ++i) {
                     TranslatorUtils::logDebug("  Param " + std::to_string(i) + ": " + parameters[i].name +
@@ -2003,38 +2007,38 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
                 ss << ", ";
             }
 
-            // Check if this parameter should be passed by reference
+            // 检查此参数是否应通过引用传递
             bool isReferenceParam = false;
             bool isArrayType = false;
             bool isMultidimensionalArray = false;
 
-            // Fix parameter ordering issue: The parameters in the scope's parameters list are
-            // stored in reverse order compared to how they appear in Pascal source.
-            // We need to reverse the index to match the correct parameter.
+            // 修复参数排序问题：作用域参数列表中的参数
+            // 与它们在Pascal源代码中出现的顺序相比是相反的。
+            // 我们需要反转索引以匹配正确的参数。
             if (parameters.size() == args.size()) {
-                // Calculate the correct parameter index (parameters are in reverse order)
+                // 计算正确的参数索引（参数顺序相反）
                 size_t paramIndex = parameters.size() - 1 - i;
 
                 isReferenceParam = parameters[paramIndex].isReference;
 
-                // Debug output to verify reference parameter detection
+                // 调试输出以验证引用参数检测
                 TranslatorUtils::logDebug("  Checking arg " + std::to_string(i) + ": " + args[i] +
                                           ", isRef: " + (isReferenceParam ? "true" : "false") +
                                           ", paramIndex: " + std::to_string(paramIndex));
 
-                // Check if the argument is an array
+                // 检查参数是否为数组
                 std::string argBase = args[i];
                 size_t bracketPos = argBase.find('[');
                 size_t parenPos = argBase.find('(');
 
-                // Extract base variable name if it has array indexing or function call
+                // 如果有数组索引或函数调用，提取基本变量名
                 if (bracketPos != std::string::npos) {
                     argBase = argBase.substr(0, bracketPos);
                 } else if (parenPos != std::string::npos) {
                     argBase = argBase.substr(0, parenPos);
                 }
 
-                // Check if the argument is an array and if it's multidimensional
+                // 检查参数是否为数组以及是否为多维数组
                 if (symbolTable->hasSymbol(argBase)) {
                     const SymbolEntry &argEntry = symbolTable->getSymbol(argBase);
                     isArrayType = (argEntry.dataType == PascalType::ARRAY);
@@ -2045,11 +2049,11 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
                                               ", dimensions: " + std::to_string(argEntry.arrayDimensions.size()));
                 }
 
-                // Handle regular arrays and multidimensional arrays differently
+                // 区别处理常规数组和多维数组
                 if (isArrayType) {
-                    // If it's an array indexing operation, we need to check if we're passing a slice of the array
+                    // 如果是数组索引操作，我们需要检查是否传递的是数组的一部分
                     if (args[i].find('[') != std::string::npos) {
-                        // Count the number of dimensions in the original array vs. the array access
+                        // 计算原始数组与数组访问中的维度数
                         int accessedDimensions = 0;
                         size_t pos = 0;
                         while ((pos = args[i].find('[', pos)) != std::string::npos) {
@@ -2057,19 +2061,18 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
                             pos++;
                         }
 
-                        // If using the parameter as an array, check dimensions
                         bool isFullyIndexed = false;
                         if (symbolTable->hasSymbol(argBase)) {
                             const SymbolEntry &argEntry = symbolTable->getSymbol(argBase);
                             isFullyIndexed = (accessedDimensions >= argEntry.arrayDimensions.size());
                         }
 
-                        // If we're passing a slice or the parameter expects an array
+                        // 如果我们传递的是一部分或参数需要一个数组
                         if (!isFullyIndexed) {
-                            // Pass the array element directly (it's a slice of the multidimensional array)
+                            // 直接传递数组元素（它是多维数组的一部分）
                             ss << args[i];
                         } else {
-                            // Pass the fully indexed element (might need & if it's a VAR parameter)
+                            // 传递完全索引的元素（如果是VAR参数可能需要使用&）
                             if (isReferenceParam) {
                                 ss << "(&(" << args[i] << "))";
                             } else {
@@ -2077,16 +2080,16 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
                             }
                         }
                     } else {
-                        // Passing the whole array - no & needed as arrays are passed by reference by default
+                        // 传递整个数组 - 不需要使用&，因为数组默认按引用传递
                         ss << args[i];
                     }
                 }
-                    // For non-array parameters that are passed by reference
+                    // 对于通过引用传递的非数组参数
                 else if (isReferenceParam) {
                     ss << "(&(" << args[i] << "))";
                     TranslatorUtils::logDebug("  Adding & to " + args[i]);
                 } else {
-                    // Regular value parameter
+                    // 常规值参数
                     ss << args[i];
                 }
             } else {
@@ -2100,7 +2103,7 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
 
         return ss.str();
     }
-        // Function call without parentheses (for Pascal functions with no parameters)
+        // 不带括号的函数调用（适用于没有参数的Pascal函数）
     else if (context->ID() && !context->expressionList()) {
         std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
 
@@ -2112,35 +2115,35 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
             std::cout << "----------------------------------------------------------" << std::endl;
         }
 
-        // Check if this ID is a function in the symbol table
+        // 检查此ID是否是符号表中的函数
         if (symbolTable->hasSymbol(id)) {
             const SymbolEntry &entry = symbolTable->getSymbol(id);
 
-            // If it's a function and it has a scope (meaning it's a function declaration, not a variable)
+            // 如果它是一个函数，并且它有一个作用域（意味着它是一个函数声明，而不是变量）
             if (entry.symbolType == SymbolType::FUNCTION && symbolTable->hasScope(id)) {
                 const ScopeEntry &scope = symbolTable->getScope(id);
-                // Check if the function has no parameters
+                // 检查函数是否没有参数
                 if (scope.getParameters().empty()) {
-                    // This is a parameter-less function call without parentheses
-                    // In C, we need to add the parentheses
+                    // 这是一个不带括号的无参数函数调用
+                    // 在C中，我们需要添加括号
                     return id + "()";
                 }
             } else if (entry.symbolType == SymbolType::PARAMETER) {
                 if (entry.isReference && symbolTable->hasSymbolInCurrentScope(id)) {
-                    // For non-array reference parameters, we need to dereference when accessing
+                    // 对于非数组引用参数，在访问时需要解引用
                     return "(*" + id + ")";
                 }
             }
 
-            // Special case: if we're in a function and we're referencing the function's name
-            // as a variable (typical for recursive functions in Pascal)
+            // 特殊情况：如果我们在一个函数中，并且我们引用的是函数自身的名称
+            // 作为变量（在Pascal递归函数中很典型）
             if (id == symbolTable->getCurrentScope().getScopeName()) {
-                // This is accessing our own function's return value
+                // 这是访问我们自己函数的返回值
                 return id + "tmp";
             }
         }
 
-        // If not recognized as a function with no parameters, treat as a regular variable
+        // 如果未被识别为无参数函数，则视为常规变量
         return id;
     }
         // Logical NOT operation
@@ -2157,7 +2160,7 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
         }
         return antlrcpp::Any(std::string("~(") + factor + ")");
     }
-        // Unary minus operation
+        // 一元负号操作
     else if (context->MINUS()) {
         auto result = visit(context->factor());
         std::string factor = result.as<std::string>();
@@ -2172,7 +2175,7 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
 
         return antlrcpp::Any(std::string("-(") + factor + ")");
     }
-        // Unary plus operation
+        // 一元正号操作
     else if (context->PLUS()) {
         auto result = visit(context->factor());
         std::string factor = result.as<std::string>();
@@ -2187,11 +2190,11 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
 
         return antlrcpp::Any(std::string("+(") + factor + ")");
     }
-        // String literal
+        // 字符串字面量
     else if (context->STRING()) {
         return context->STRING()->getText();
     }
-        // Character literal
+        // 字符字面量
     else if (context->LETTER()) {
         return antlrcpp::Any(
                 std::string((TranslatorUtils::toCIdentifier(context->LETTER()->getText()) == "true") ? "1" : "0"));
@@ -2201,70 +2204,70 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
 }
 
 /**
- * Processes a numeric literal
- * @param context The num context
- * @return String representation of the number
+ * 处理数字字面量
+ * @param context 数字上下文
+ * @return 数字的字符串表示
  */
 antlrcpp::Any PascalToCTranslator::visitNum(PascalSParser::NumContext *context) {
     return context->NUM()->getText();
 }
 
 /**
- * Processes a relational operator (==, !=, <, <=, >, >=)
- * @param context The relop context
- * @return String representation of the operator in C syntax
+ * 处理关系运算符（==, !=, <, <=, >, >=）
+ * @param context 关系运算符上下文
+ * @return C语法中运算符的字符串表示
  */
 antlrcpp::Any PascalToCTranslator::visitRelop(PascalSParser::RelopContext *context) {
     if (context->EQUAL()) {
-        return antlrcpp::Any(std::string("=="));  // Pascal = becomes == in C
+        return antlrcpp::Any(std::string("=="));  // Pascal的=在C中变为==
     } else if (context->NOTEQUAL()) {
-        return antlrcpp::Any(std::string("!="));  // Pascal <> becomes != in C
+        return antlrcpp::Any(std::string("!="));  // Pascal的<>在C中变为!=
     } else if (context->LT()) {
-        return antlrcpp::Any(std::string("<"));   // Pascal < same in C
+        return antlrcpp::Any(std::string("<"));   // Pascal的<在C中保持不变
     } else if (context->LE()) {
-        return antlrcpp::Any(std::string("<="));  // Pascal <= same in C
+        return antlrcpp::Any(std::string("<="));  // Pascal的<=在C中保持不变
     } else if (context->GT()) {
-        return antlrcpp::Any(std::string(">"));   // Pascal > same in C
+        return antlrcpp::Any(std::string(">"));   // Pascal的>在C中保持不变
     } else if (context->GE()) {
-        return antlrcpp::Any(std::string(">="));  // Pascal >= same in C
+        return antlrcpp::Any(std::string(">="));  // Pascal的>=在C中保持不变
     }
 
     return antlrcpp::Any(std::string(""));
 }
 
 /**
- * Processes an additive operator (+, -, OR)
- * @param context The addop context
- * @return String representation of the operator in C syntax
+ * 处理加法运算符（+, -, OR）
+ * @param context 加法运算符上下文
+ * @return C语法中运算符的字符串表示
  */
 antlrcpp::Any PascalToCTranslator::visitAddop(PascalSParser::AddopContext *context) {
     if (context->PLUS()) {
-        return antlrcpp::Any(std::string("+"));   // Pascal + same in C
+        return antlrcpp::Any(std::string("+"));   // Pascal的+在C中保持不变
     } else if (context->MINUS()) {
-        return antlrcpp::Any(std::string("-"));   // Pascal - same in C
+        return antlrcpp::Any(std::string("-"));   // Pascal的-在C中保持不变
     } else if (context->OR()) {
-        return antlrcpp::Any(std::string("||"));  // Pascal OR becomes || in C
+        return antlrcpp::Any(std::string("||"));  // Pascal的OR在C中变为||
     }
 
     return antlrcpp::Any(std::string(""));
 }
 
 /**
- * Processes a multiplicative operator (*, /, DIV, MOD, AND)
- * @param context The mulop context
- * @return String representation of the operator in C syntax
+ * 处理乘法运算符（*, /, DIV, MOD, AND）
+ * @param context 乘法运算符上下文
+ * @return C语法中运算符的字符串表示
  */
 antlrcpp::Any PascalToCTranslator::visitMulop(PascalSParser::MulopContext *context) {
     if (context->STAR()) {
-        return antlrcpp::Any(std::string("*"));   // Pascal * same in C
+        return antlrcpp::Any(std::string("*"));   // Pascal的*在C中保持不变
     } else if (context->SLASH()) {
-        return antlrcpp::Any(std::string("/"));   // Pascal / same in C (float division)
+        return antlrcpp::Any(std::string("/"));   // Pascal的/在C中保持不变（浮点除法）
     } else if (context->DIV()) {
-        return antlrcpp::Any(std::string("/"));   // Pascal DIV becomes / in C (integer division)
+        return antlrcpp::Any(std::string("/"));   // Pascal的DIV在C中变为/（整数除法）
     } else if (context->MOD()) {
-        return antlrcpp::Any(std::string("%"));   // Pascal MOD becomes % in C
+        return antlrcpp::Any(std::string("%"));   // Pascal的MOD在C中变为%
     } else if (context->AND()) {
-        return antlrcpp::Any(std::string("&&"));  // Pascal AND becomes && in C
+        return antlrcpp::Any(std::string("&&"));  // Pascal的AND在C中变为&&
     }
 
     return antlrcpp::Any(std::string(""));
