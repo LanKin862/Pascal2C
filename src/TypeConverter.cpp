@@ -6,26 +6,26 @@
 
 
 /**
- * Constructor for the TypeConverter class
- * Initializes the mapping between Pascal types and their C equivalents
+ * TypeConverter类的构造函数
+ * 初始化Pascal类型与其C语言等效类型之间的映射
  */
 TypeConverter::TypeConverter() {
-    // Initialize the type mapping from Pascal types to C types
-    typeMap[PascalType::INTEGER] = "int";        // Pascal INTEGER maps to C int
-    typeMap[PascalType::REAL] = "float";         // Pascal REAL maps to C float
-    typeMap[PascalType::BOOLEAN] = "int";        // Pascal BOOLEAN maps to C int (0 for false, non-zero for true)
-    typeMap[PascalType::CHAR] = "char";          // Pascal CHAR maps to C char
-    typeMap[PascalType::ARRAY] = "";             // Arrays are handled separately based on element type and dimensions
+    // 初始化从Pascal类型到C类型的映射
+    typeMap[PascalType::INTEGER] = "int";        // Pascal INTEGER映射到C int
+    typeMap[PascalType::REAL] = "float";         // Pascal REAL映射到C float
+    typeMap[PascalType::BOOLEAN] = "int";        // Pascal BOOLEAN映射到C int (0表示false，非零表示true)
+    typeMap[PascalType::CHAR] = "char";          // Pascal CHAR映射到C char
+    typeMap[PascalType::ARRAY] = "";             // 数组根据元素类型和维度单独处理
 }
 
 /**
- * Converts a Pascal basic type to its C equivalent
- * @param type The Pascal type to convert
- * @return The corresponding C type as a string
- * @throws TranslatorException if the Pascal type is unknown
+ * 将Pascal基本类型转换为其C语言等效类型
+ * @param type 要转换的Pascal类型
+ * @return 对应的C类型的字符串表示
+ * @throws TranslatorException 如果Pascal类型未知
  */
 std::string TypeConverter::convertType(PascalType type) const {
-    // Look up the Pascal type in the map
+    // 在映射中查找Pascal类型
     auto it = typeMap.find(type);
     if (it == typeMap.end()) {
         throw TranslatorException("Unknown Pascal type");
@@ -34,23 +34,23 @@ std::string TypeConverter::convertType(PascalType type) const {
 }
 
 /**
- * Converts a Pascal array type to its C equivalent
- * In Pascal, arrays can have arbitrary bounds (e.g., array[5..10] of integer)
- * In C, arrays are zero-based and the size is the number of elements
+ * 将Pascal数组类型转换为其C语言等效类型
+ * 在Pascal中，数组可以有任意边界（例如，array[5..10] of integer）
+ * 在C中，数组是从零开始的，大小是元素的数量
  * 
- * @param elementType The Pascal type of the array elements
- * @param dimensions Vector of array bounds (lower and upper) for each dimension
- * @return The corresponding C array type as a string (e.g., "int[6]")
+ * @param elementType 数组元素的Pascal类型
+ * @param dimensions 每个维度的数组边界（下界和上界）向量
+ * @return 对应的C数组类型的字符串表示（例如，"int[6]"）
  */
 std::string TypeConverter::convertArrayType(PascalType elementType, const std::vector<ArrayBounds>& dimensions) const {
-    // Get the base type (element type) for the array
+    // 获取数组的基本类型（元素类型）
     std::string baseType = convertType(elementType);
     std::stringstream ss;
     ss << baseType;
 
-    // Add dimensions in C style (e.g., int[10] for array[1..10] of integer)
-    // For each dimension, we calculate the size as (upperBound - lowerBound + 1)
-    // Keep dimensions in the same order as they appear in Pascal
+    // 以C语言风格添加维度（例如，对于array[1..10] of integer，使用int[10]）
+    // 对于每个维度，我们计算大小为(upperBound - lowerBound + 1)
+    // 维度顺序与Pascal中的出现顺序相同
     for (const auto& dim : dimensions) {
         int size = dim.upperBound - dim.lowerBound + 1;
         ss << "[" << size << "]";
@@ -60,43 +60,43 @@ std::string TypeConverter::convertArrayType(PascalType elementType, const std::v
 }
 
 /**
- * Converts Pascal operators to their C equivalents
- * Many operators are different between Pascal and C, especially
- * comparison operators and logical operators
+ * 将Pascal运算符转换为其C语言等效运算符
+ * Pascal和C之间的许多运算符是不同的，特别是
+ * 比较运算符和逻辑运算符
  * 
- * @param op The Pascal operator as a string
- * @return The corresponding C operator as a string
+ * @param op Pascal运算符的字符串表示
+ * @return 对应的C运算符的字符串表示
  */
 std::string TypeConverter::convertOperator(const std::string& op) const {
-    // Map Pascal operators to C operators
-    if (op == "=") return "==";        // Pascal equality (=) becomes C equality (==)
-    if (op == "<>") return "!=";       // Pascal inequality (<>) becomes C inequality (!=)
-    if (op == "AND") return "&&";      // Pascal logical AND becomes C logical AND (&&)
-    if (op == "OR") return "||";       // Pascal logical OR becomes C logical OR (||)
-    if (op == "NOT") return "!";       // Pascal logical NOT becomes C logical NOT (!)
-    if (op == "DIV") return "/";       // Pascal integer division (DIV) becomes C division (/)
-    if (op == "MOD") return "%";       // Pascal modulo (MOD) becomes C modulo (%)
+    // 将Pascal运算符映射到C运算符
+    if (op == "=") return "==";        // Pascal等于(=)变成C等于(==)
+    if (op == "<>") return "!=";       // Pascal不等于(<>)变成C不等于(!=)
+    if (op == "AND") return "&&";      // Pascal逻辑AND变成C逻辑AND(&&)
+    if (op == "OR") return "||";       // Pascal逻辑OR变成C逻辑OR(||)
+    if (op == "NOT") return "!";       // Pascal逻辑NOT变成C逻辑NOT(!)
+    if (op == "DIV") return "/";       // Pascal整数除法(DIV)变成C除法(/)
+    if (op == "MOD") return "%";       // Pascal模运算(MOD)变成C模运算(%)
 
-    // Default case: return the operator unchanged (e.g., +, -, *, /, <, >, <=, >=)
+    // 默认情况：保持运算符不变（例如，+, -, *, /, <, >, <=, >=）
     return op;
 }
 
 /**
- * Converts Pascal boolean literals to their C equivalents
- * Pascal uses TRUE/FALSE, while C uses 1/0 for boolean values
+ * 将Pascal布尔字面量转换为其C语言等效值
+ * Pascal使用TRUE/FALSE，而C使用1/0表示布尔值
  * 
- * @param value The Pascal boolean value as a string
- * @return The corresponding C boolean value as a string
+ * @param value Pascal布尔值的字符串表示
+ * @return 对应的C布尔值的字符串表示
  */
 std::string TypeConverter::convertBooleanValue(const std::string& value) const {
-    // Convert Pascal boolean values to C boolean values
+    // 将Pascal布尔值转换为C布尔值
     if (value == "TRUE" || value == "true") {
-        return "1";                    // Pascal TRUE becomes C 1
+        return "1";                    // Pascal TRUE变成C 1
     } else if (value == "FALSE" || value == "false") {
-        return "0";                    // Pascal FALSE becomes C 0
+        return "0";                    // Pascal FALSE变成C 0
     }
 
-    // If it's not a boolean literal, return it unchanged
-    // This handles variables and expressions that evaluate to boolean
+    // 如果它不是布尔字面量，保持不变
+    // 这处理了计算结果为布尔值的变量和表达式
     return value;
 }
