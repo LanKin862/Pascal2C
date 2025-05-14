@@ -4,32 +4,25 @@
 #include <stdexcept>
 #include <string>
 
-/**
- * 翻译器异常类
- * 用于在翻译过程中报告错误
- */
+// Exception class for translator errors
 class TranslatorException : public std::runtime_error {
   public:
-    // 使用基类构造函数
-    using std::runtime_error::runtime_error;
+    TranslatorException(const std::string& message) : std::runtime_error(message) {}
 };
 
-/**
- * 翻译器工具类
- * 提供用于日志记录和字符串处理的静态方法
- */
+// Utility class for translator
 class TranslatorUtils {
   public:
-    // 日志记录函数
+    // Log functions
     static void logError(const std::string& message);
     static void logWarning(const std::string& message);
     static void logInfo(const std::string& message);
     static void logDebug(const std::string& message);
 
-    // 字符串处理函数
-    static std::string toCIdentifier(const std::string& identifier);
+    // String manipulation functions
+    static std::string toCIdentifier(const std::string& pascalIdentifier);
     static std::string escapeString(const std::string& str);
 
-    // 检查字符串是否为有效标识符
+    // Check if a string is a valid identifier
     static bool isValidIdentifier(const std::string& str);
 };

@@ -13,22 +13,11 @@
 #include "antlr4-runtime.h"
 #include "support/Any.h"
 
-/**
- * PascalToCTranslator类实现了从Pascal-S语言到C语言的翻译
- * 该类继承自生成的PascalSVisitor基类，以访问语法树节点
- */
 class PascalToCTranslator : public PascalSVisitor {
   private:
-    // 符号表用于跟踪变量、函数和作用域
     std::unique_ptr<SymbolTable> symbolTable;
-    
-    // 类型转换器用于将Pascal类型转换为C类型
     std::unique_ptr<TypeConverter> typeConverter;
-    
-    // 存储翻译后的C代码的输出流
     std::stringstream output;
-    
-    // 缩进管理
     std::string indentation;
     bool isInGlobalScope;
     int tempVarCounter;
@@ -40,17 +29,12 @@ class PascalToCTranslator : public PascalSVisitor {
     void generateForwardDeclarations(PascalSParser::SubprogramDeclarationsContext *context);
 
   public:
-    // 构造函数和析构函数
     PascalToCTranslator();
     ~PascalToCTranslator() = default;
 
-    // 主翻译方法
     std::string translate(const std::string &inputFile);
 
-    // 访问者模式实现
-    // 这些方法将被调用以访问AST中的特定节点
-    
-    // 程序结构
+    // Visitor implementation methods
     antlrcpp::Any visitProgram(PascalSParser::ProgramContext *context) override;
     antlrcpp::Any visitProgramStruct(PascalSParser::ProgramStructContext *context) override;
     antlrcpp::Any visitProgramHead(PascalSParser::ProgramHeadContext *context) override;

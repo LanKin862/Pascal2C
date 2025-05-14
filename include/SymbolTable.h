@@ -5,30 +5,23 @@
 #include <string>
 #include <vector>
 
-/**
- * 符号类型枚举
- * 用于标识符号在符号表中的角色
- */
+// Symbol type enum to differentiate between various symbol types
 enum class SymbolType {
-    VARIABLE,       // 变量
-    CONSTANT,       // 常量
-    FUNCTION,       // 函数
-    PROCEDURE,      // 过程
-    PARAMETER,      // 参数
-    TYPE            // 类型定义
+    VARIABLE,
+    CONSTANT,
+    PROCEDURE,
+    FUNCTION,
+    PARAMETER
 };
 
-/**
- * Pascal类型枚举
- * 表示Pascal支持的基本数据类型
- */
+// Basic type enum for Pascal-S types
 enum class PascalType {
-    INTEGER,        // 整数类型
-    REAL,           // 实数类型
-    BOOLEAN,        // 布尔类型
-    CHAR,           // 字符类型
-    ARRAY,          // 数组类型
-    STRING,         // 字符串类型
+    INTEGER,
+    REAL,
+    BOOLEAN,
+    CHAR,
+    ARRAY,
+    STRING
 };
 
 namespace std {
@@ -40,40 +33,31 @@ namespace std {
     };
 }
 
-/**
- * 数组边界结构
- * 存储数组类型的下界和上界
- */
+// Struct to store array bounds information
 struct ArrayBounds {
-    int lowerBound;     // 数组下界
-    int upperBound;     // 数组上界
+    int lowerBound;
+    int upperBound;
 };
 
-/**
- * 符号条目结构
- * 存储关于符号的所有信息
- */
+// Symbol entry for the symbol table
 struct SymbolEntry {
-    std::string name;    // 符号名称
-    SymbolType symbolType;    // 符号类型（变量、常量、函数等）
-    PascalType dataType;     // 数据类型（整数、实数、布尔等）
-    bool isReference;                            // 是否是引用参数（用于VAR参数）
-    std::vector<ArrayBounds> arrayDimensions;    // 数组维度（如果是数组类型）
-    PascalType arrayElementType;
-    std::string value;
+    std::string name;
+    SymbolType symbolType;
+    PascalType dataType;
+    bool isReference;                          // Used for VAR parameters
+    std::vector<ArrayBounds> arrayDimensions;  // For array types
+    PascalType arrayElementType;               // For array types, the type of elements
+    std::string value;                         // For constants
 };
 
-/**
- * 作用域条目类
- * 表示符号表中的单个作用域（如全局作用域或函数作用域）
- */
+// Scope entry for the symbol table
 class ScopeEntry {
-private:
-    std::string scopeName;                      // 作用域名称
-    std::map<std::string, SymbolEntry> symbols; // 该作用域中的符号映射
-    std::vector<SymbolEntry> parameters;        // 按顺序排列的参数（用于函数和过程）
+  private:
+    std::map<std::string, SymbolEntry> symbols;
+    std::string scopeName;
+    std::vector<SymbolEntry> parameters;  // To store parameters in order of declaration
 
-public:
+  public:
     ScopeEntry(const std::string& name);
     bool addSymbol(const SymbolEntry& symbol);
     bool hasSymbol(const std::string& name) const;
@@ -82,28 +66,24 @@ public:
     std::map<std::string, SymbolEntry>& getSymbols();
     const std::map<std::string, SymbolEntry>& getSymbols() const;
     std::string getScopeName() const;
-    //将参数添加到有序列表中（对于过程和函数）
+    // Add parameter to ordered list (for procedures and functions)
     void addParameter(const SymbolEntry& param);
-    //按顺序获取参数
+    // Get parameters in order
     const std::vector<SymbolEntry>& getParameters() const;
-    //获取对参数vector的可变引用以进行修改
+    // Get mutable reference to parameters vector for modification
     std::vector<SymbolEntry>& getParameters();
 };
 
-/**
- * 符号表类
- * 管理嵌套作用域的符号信息
- */
+// Symbol table class to manage symbols and scopes
 class SymbolTable {
-private:
-    std::vector<std::unique_ptr<ScopeEntry>> scopes; // 作用域堆栈
-    int currentScopeIndex;                          // 当前作用域索引
+  private:
+    std::vector<std::unique_ptr<ScopeEntry>> scopes;
+    int currentScopeIndex;
 
-public:
-    // 构造函数
+  public:
     SymbolTable();
 
-    // 作用域管理
+    // Scope management
     void enterScope(const std::string& scopeName);
     void exitScope();
     bool isInGlobalScope() const;
@@ -112,7 +92,7 @@ public:
     bool hasScope(const std::string& scopeName) const;
     const ScopeEntry& getScope(const std::string& scopeName) const;
 
-    // 符号管理
+    // Symbol management
     bool addSymbol(const SymbolEntry& symbol);
     bool hasSymbolInCurrentScope(const std::string& name) const;
     bool hasSymbol(const std::string& name) const;

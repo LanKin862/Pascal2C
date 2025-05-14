@@ -2,31 +2,25 @@
 
 #include <string>
 #include <unordered_map>
-#include <vector>
 
 #include "SymbolTable.h"
 
-/**
- * TypeConverter类负责将Pascal类型和表达式转换为C语言等效形式
- */
 class TypeConverter {
-private:
-    // Pascal类型到C类型的映射
+  private:
     std::unordered_map<PascalType, std::string> typeMap;
 
 public:
-    // 构造函数初始化类型映射
     TypeConverter();
 
-    // 将Pascal基本类型转换为C类型
+    // Convert a Pascal-S type to a C type
     std::string convertType(PascalType type) const;
 
-    // 将Pascal数组类型转换为C数组类型
+    // Convert a Pascal-S type with array dimensions to a C type
     std::string convertArrayType(PascalType elementType, const std::vector<ArrayBounds>& dimensions) const;
 
-    // 将Pascal运算符转换为C运算符
+    // Convert a Pascal-S expression operator to a C operator
     std::string convertOperator(const std::string& op) const;
 
-    // 将Pascal布尔值转换为C布尔值
+    // Convert a Pascal-S boolean value to a C boolean value
     std::string convertBooleanValue(const std::string& value) const;
 };

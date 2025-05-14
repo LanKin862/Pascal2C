@@ -11,7 +11,7 @@ void printUsage() {
     std::cout << "output will be written to <input_file>.c" << std::endl;
 }
 
-// 将文件内容读入字符串的函数
+// Function to read file contents into a string
 std::string readFileContents(const std::string& filePath) {
     std::ifstream inFile(filePath);
     if (!inFile) {
@@ -25,7 +25,7 @@ std::string readFileContents(const std::string& filePath) {
     return buffer.str();
 }
 
-// 将内容写入文件的函数
+// Function to write content to a file
 bool writeToFile(const std::string& filePath, const std::string& content) {
     std::ofstream outFile(filePath);
     if (!outFile) {
@@ -38,17 +38,17 @@ bool writeToFile(const std::string& filePath, const std::string& content) {
 }
 
 int main(int argc, char* argv[]) {
-    // 检查命令行参数
+    // Check command line arguments
     if (argc < 3 || std::string(argv[1]) != "-i") {
         printUsage();
         return 1;
     }
 
-    // 获取输入文件路径
+    // Get input file path
     std::string inputFile = argv[2];
     std::string outputFile;
 
-    // 默认输出文件名是输入文件名加.c扩展名
+    // Default output file name is input file name with .c extension
     size_t dotPos = inputFile.find_last_of('.');
     if (dotPos != std::string::npos) {
         outputFile = inputFile.substr(0, dotPos) + ".c";
@@ -57,28 +57,28 @@ int main(int argc, char* argv[]) {
     }
 
     try {
-        // 读取并显示输入文件的内容
+        // Read and display the contents of the input file
         std::string inputFileContents = readFileContents(inputFile);
 
-        // 创建翻译器
+        // Create translator
         PascalToCTranslator translator;
 
-        // 翻译输入文件
+        // Translate the input file
         std::string cCode = translator.translate(inputFile);
 
-        // 检查翻译是否成功
+        // Check if translation was successful
         if (cCode.empty()) {
             std::cerr << "Translation failed." << std::endl;
             return 1;
         }
 
-        // 将翻译后的代码写入输出文件
+        // Write the translated code to the output file
         if (!writeToFile(outputFile, cCode)) {
             std::cerr << "Failed to open or write to output file: " << outputFile << std::endl;
             return 1;
         }
 
-//        // 创建包含详细信息的额外文件（如需要）
+//        // Create additional files with detailed information if needed
 //        std::string debugFile = outputFile + ".debug";
 //        std::stringstream debugInfo;
 //        debugInfo << "Original Pascal-S code:\n";
