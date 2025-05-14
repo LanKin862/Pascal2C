@@ -12,15 +12,15 @@ class TypeConverter {
 public:
     TypeConverter();
 
-    // Convert a Pascal-S type to a C type
+    // 将 Pascal-S 类型转换为 C 类型
     std::string convertType(PascalType type) const;
 
-    // Convert a Pascal-S type with array dimensions to a C type
+    // 将带数组维度的 Pascal-S 类型转换为 C 类型
     std::string convertArrayType(PascalType elementType, const std::vector<ArrayBounds>& dimensions) const;
 
-    // Convert a Pascal-S expression operator to a C operator
+    // 将 Pascal-S 表达式运算符转换为 C 运算符
     std::string convertOperator(const std::string& op) const;
 
-    // Convert a Pascal-S boolean value to a C boolean value
+    // 将 Pascal-S 布尔值转换为 C 布尔值
     std::string convertBooleanValue(const std::string& value) const;
 };

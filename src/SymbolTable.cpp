@@ -2,30 +2,30 @@
 
 #include "../include/TranslatorUtils.h"
 
-// ScopeEntry implementation
+// ScopeEntry 实现
 
 /**
- * Constructor for a scope entry
- * @param name The name of the scope (e.g., function name or "global")
+ * 作用域条目的构造函数
+ * @param name 作用域的名称（例如，函数名或"global"）
  */
 ScopeEntry::ScopeEntry(const std::string& name) : scopeName(name) {}
 
 /**
- * Adds a symbol to the current scope
- * @param symbol The symbol entry to add
- * @return true if the symbol was added successfully, false if a symbol with the same name already exists
+ * 向当前作用域添加符号
+ * @param symbol 要添加的符号条目
+ * @return 如果符号添加成功则为true，如果具有相同名称的符号已存在则为false
  */
 bool ScopeEntry::addSymbol(const SymbolEntry& symbol) {
-    // Check if symbol already exists in this scope
+    // 检查此作用域中是否已存在符号
     if (hasSymbol(symbol.name)) {
         return false;
     }
     
-    // Add the symbol to the map
+    // 将符号添加到映射中
     symbols[symbol.name] = symbol;
     
-    // If this is a parameter, add it to the ordered parameter list
-    // This is important for function calls to match arguments with parameters
+    // 如果这是一个参数，则将其添加到有序参数列表中
+    // 这对于函数调用将参数与形参匹配很重要
     if (symbol.symbolType == SymbolType::PARAMETER) {
         addParameter(symbol);
     }
@@ -34,44 +34,44 @@ bool ScopeEntry::addSymbol(const SymbolEntry& symbol) {
 }
 
 /**
- * Adds a parameter to the ordered parameter list
- * This is separate from the symbol map to maintain parameter order
- * @param param The parameter symbol to add
+ * 向有序参数列表添加参数
+ * 这与符号映射分开，以维护参数顺序
+ * @param param 要添加的参数符号
  */
 void ScopeEntry::addParameter(const SymbolEntry& param) {
     parameters.push_back(param);
 }
 
 /**
- * Gets the list of parameters for this scope
- * @return Const reference to the parameter list
+ * 获取此作用域的参数列表
+ * @return 参数列表的常量引用
  */
 const std::vector<SymbolEntry>& ScopeEntry::getParameters() const {
     return parameters;
 }
 
 /**
- * Gets the list of parameters for this scope (mutable version)
- * @return Reference to the parameter list that can be modified
+ * 获取此作用域的参数列表（可变版本）
+ * @return 可以修改的参数列表引用
  */
 std::vector<SymbolEntry>& ScopeEntry::getParameters() {
     return parameters;
 }
 
 /**
- * Checks if a symbol exists in this scope
- * @param name The name of the symbol to look for
- * @return true if the symbol exists in this scope, false otherwise
+ * 检查符号是否存在于此作用域中
+ * @param name 要查找的符号名称
+ * @return 如果符号存在于此作用域中则为true，否则为false
  */
 bool ScopeEntry::hasSymbol(const std::string& name) const {
     return symbols.find(name) != symbols.end();
 }
 
 /**
- * Gets a symbol from this scope
- * @param name The name of the symbol to retrieve
- * @return Reference to the symbol entry
- * @throws TranslatorException if the symbol doesn't exist
+ * 从此作用域获取符号
+ * @param name 要检索的符号名称
+ * @return 符号条目的引用
+ * @throws TranslatorException 如果符号不存在
  */
 SymbolEntry& ScopeEntry::getSymbol(const std::string& name) {
     if (!hasSymbol(name)) {
@@ -81,10 +81,10 @@ SymbolEntry& ScopeEntry::getSymbol(const std::string& name) {
 }
 
 /**
- * Gets a symbol from this scope (const version)
- * @param name The name of the symbol to retrieve
- * @return Const reference to the symbol entry
- * @throws TranslatorException if the symbol doesn't exist
+ * 从此作用域获取符号（常量版本）
+ * @param name 要检索的符号名称
+ * @return 符号条目的常量引用
+ * @throws TranslatorException 如果符号不存在
  */
 const SymbolEntry& ScopeEntry::getSymbol(const std::string& name) const {
     if (!hasSymbol(name)) {
@@ -94,44 +94,44 @@ const SymbolEntry& ScopeEntry::getSymbol(const std::string& name) const {
 }
 
 /**
- * Gets all symbols in this scope
- * @return Reference to the map of all symbols
+ * 获取此作用域中的所有符号
+ * @return 所有符号映射的引用
  */
 std::map<std::string, SymbolEntry>& ScopeEntry::getSymbols() {
     return symbols;
 }
 
 /**
- * Gets all symbols in this scope (const version)
- * @return Const reference to the map of all symbols
+ * 获取此作用域中的所有符号（常量版本）
+ * @return 所有符号映射的常量引用
  */
 const std::map<std::string, SymbolEntry>& ScopeEntry::getSymbols() const {
     return symbols;
 }
 
 /**
- * Gets the name of this scope
- * @return The scope name
+ * 获取此作用域的名称
+ * @return 作用域名称
  */
 std::string ScopeEntry::getScopeName() const {
     return scopeName;
 }
 
-// SymbolTable implementation
+// SymbolTable 实现
 
 /**
- * Constructor for the symbol table
- * Initializes with a global scope by default
+ * 符号表的构造函数
+ * 默认初始化为全局作用域
  */
 SymbolTable::SymbolTable() : currentScopeIndex(-1) {
-    // Initialize with global scope
+    // 使用全局作用域初始化
     enterScope("global");
 }
 
 /**
- * Creates a new scope and makes it the current scope
- * Used when entering functions, procedures, or blocks
- * @param scopeName The name of the new scope
+ * 创建新作用域并使其成为当前作用域
+ * 用于进入函数、过程或代码块
+ * @param scopeName 新作用域的名称
  */
 void SymbolTable::enterScope(const std::string& scopeName) {
     scopes.push_back(std::unique_ptr<ScopeEntry>(new ScopeEntry(scopeName)));
@@ -139,9 +139,9 @@ void SymbolTable::enterScope(const std::string& scopeName) {
 }
 
 /**
- * Exits the current scope and returns to the parent scope
- * Used when leaving functions, procedures, or blocks
- * @throws TranslatorException if attempting to exit the global scope
+ * 退出当前作用域并返回到父作用域
+ * 用于离开函数、过程或代码块
+ * @throws TranslatorException 如果尝试退出全局作用域
  */
 void SymbolTable::exitScope() {
     if (currentScopeIndex <= 0) {
@@ -151,33 +151,33 @@ void SymbolTable::exitScope() {
 }
 
 /**
- * Checks if we're currently in the global scope
- * @return true if in global scope, false otherwise
+ * 检查当前是否在全局作用域中
+ * @return 如果在全局作用域中则为true，否则为false
  */
 bool SymbolTable::isInGlobalScope() const {
     return currentScopeIndex == 0;
 }
 
 /**
- * Gets the current scope
- * @return Reference to the current scope entry
+ * 获取当前作用域
+ * @return 当前作用域条目的引用
  */
 ScopeEntry& SymbolTable::getCurrentScope() {
     return *scopes[currentScopeIndex];
 }
 
 /**
- * Gets the current scope (const version)
- * @return Const reference to the current scope entry
+ * 获取当前作用域（常量版本）
+ * @return 当前作用域条目的常量引用
  */
 const ScopeEntry& SymbolTable::getCurrentScope() const {
     return *scopes[currentScopeIndex];
 }
 
 /**
- * Checks if a scope with the given name exists
- * @param scopeName The name of the scope to look for
- * @return true if the scope exists, false otherwise
+ * 检查是否存在具有给定名称的作用域
+ * @param scopeName 要查找的作用域的名称
+ * @return 如果作用域存在则为true，否则为false
  */
 bool SymbolTable::hasScope(const std::string& scopeName) const {
     for (const auto& scope : scopes) {
@@ -189,11 +189,11 @@ bool SymbolTable::hasScope(const std::string& scopeName) const {
 }
 
 /**
- * Gets a scope by name
- * Used to look up function/procedure scopes for parameter information
- * @param scopeName The name of the scope to retrieve
- * @return Const reference to the scope entry
- * @throws TranslatorException if the scope doesn't exist
+ * 按名称获取作用域
+ * 用于查找函数/过程作用域以获取参数信息
+ * @param scopeName 要检索的作用域的名称
+ * @return 作用域条目的常量引用
+ * @throws TranslatorException 如果作用域不存在
  */
 const ScopeEntry& SymbolTable::getScope(const std::string& scopeName) const {
     for (const auto& scope : scopes) {
@@ -205,31 +205,31 @@ const ScopeEntry& SymbolTable::getScope(const std::string& scopeName) const {
 }
 
 /**
- * Adds a symbol to the current scope
- * @param symbol The symbol entry to add
- * @return true if the symbol was added successfully, false if a symbol with the same name already exists
+ * 向当前作用域添加符号
+ * @param symbol 要添加的符号条目
+ * @return 如果符号添加成功则为true，如果具有相同名称的符号已存在则为false
  */
 bool SymbolTable::addSymbol(const SymbolEntry& symbol) {
     return getCurrentScope().addSymbol(symbol);
 }
 
 /**
- * Checks if a symbol exists in the current scope
- * @param name The name of the symbol to look for
- * @return true if the symbol exists in the current scope, false otherwise
+ * 检查符号是否存在于当前作用域中
+ * @param name 要查找的符号名称
+ * @return 如果符号存在于当前作用域中则为true，否则为false
  */
 bool SymbolTable::hasSymbolInCurrentScope(const std::string& name) const {
     return getCurrentScope().hasSymbol(name);
 }
 
 /**
- * Checks if a symbol exists in the current scope or any parent scope
- * This implements Pascal's scoping rules for symbol visibility
- * @param name The name of the symbol to look for
- * @return true if the symbol exists in any accessible scope, false otherwise
+ * 检查符号是否存在于当前作用域或任何父作用域中
+ * 这实现了Pascal的符号可见性作用域规则
+ * @param name 要查找的符号名称
+ * @return 如果符号存在于任何可访问的作用域中则为true，否则为false
  */
 bool SymbolTable::hasSymbol(const std::string& name) const {
-    // Check all scopes from current to global
+    // 从当前到全局检查所有作用域
     for (int i = currentScopeIndex; i >= 0; i--) {
         if (scopes[i]->hasSymbol(name)) {
             return true;
@@ -239,14 +239,14 @@ bool SymbolTable::hasSymbol(const std::string& name) const {
 }
 
 /**
- * Gets a symbol from the current scope or any parent scope
- * Follows Pascal's scoping rules by searching from most local to global
- * @param name The name of the symbol to retrieve
- * @return Reference to the symbol entry
- * @throws TranslatorException if the symbol doesn't exist in any accessible scope
+ * 从当前作用域或任何父作用域获取符号
+ * 遵循Pascal的作用域规则，从最局部到全局进行搜索
+ * @param name 要检索的符号名称
+ * @return 符号条目的引用
+ * @throws TranslatorException 如果符号在任何可访问的作用域中都不存在
  */
 SymbolEntry& SymbolTable::getSymbol(const std::string& name) {
-    // Check all scopes from current to global
+    // 从当前到全局检查所有作用域
     for (int i = currentScopeIndex; i >= 0; i--) {
         if (scopes[i]->hasSymbol(name)) {
             return scopes[i]->getSymbol(name);
@@ -256,14 +256,14 @@ SymbolEntry& SymbolTable::getSymbol(const std::string& name) {
 }
 
 /**
- * Gets a symbol from the current scope or any parent scope (const version)
- * Follows Pascal's scoping rules by searching from most local to global
- * @param name The name of the symbol to retrieve
- * @return Const reference to the symbol entry
- * @throws TranslatorException if the symbol doesn't exist in any accessible scope
+ * 从当前作用域或任何父作用域获取符号（常量版本）
+ * 遵循Pascal的作用域规则，从最局部到全局进行搜索
+ * @param name 要检索的符号名称
+ * @return 符号条目的常量引用
+ * @throws TranslatorException 如果符号在任何可访问的作用域中都不存在
  */
 const SymbolEntry& SymbolTable::getSymbol(const std::string& name) const {
-    // Check all scopes from current to global
+    // 从当前到全局检查所有作用域
     for (int i = currentScopeIndex; i >= 0; i--) {
         if (scopes[i]->hasSymbol(name)) {
             return scopes[i]->getSymbol(name);

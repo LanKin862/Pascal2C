@@ -5,63 +5,63 @@
 #include <regex>
 
 /**
- * Logs an error message to the standard error output
- * Used for critical issues that may prevent successful translation
- * @param message The error message to log
+ * 将错误消息记录到标准错误输出
+ * 用于可能阻止成功翻译的关键问题
+ * @param message 要记录的错误消息
  */
 void TranslatorUtils::logError(const std::string& message) {
     std::cerr << "ERROR: " << message << std::endl;
 }
 
 /**
- * Logs a warning message to the standard error output
- * Used for non-critical issues that might affect translation quality
- * @param message The warning message to log
+ * 将警告消息记录到标准错误输出
+ * 用于可能影响翻译质量的非关键问题
+ * @param message 要记录的警告消息
  */
 void TranslatorUtils::logWarning(const std::string& message) {
     std::cerr << "WARNING: " << message << std::endl;
 }
 
 /**
- * Logs an informational message to the standard output
- * Used for general status updates during translation
- * @param message The information message to log
+ * 将信息消息记录到标准输出
+ * 用于翻译过程中的一般状态更新
+ * @param message 要记录的信息消息
  */
 void TranslatorUtils::logInfo(const std::string& message) {
     std::cout << "INFO: " << message << std::endl;
 }
 
 /**
- * Logs a debug message to the standard output
- * Used for detailed information helpful during development and debugging
- * @param message The debug message to log
+ * 将调试消息记录到标准输出
+ * 用于开发和调试过程中有用的详细信息
+ * @param message 要记录的调试消息
  */
 void TranslatorUtils::logDebug(const std::string& message) {
     std::cout << "DEBUG: " << message << std::endl;
 }
 
 /**
- * Converts a Pascal identifier to a C-compatible identifier
- * Handles differences in identifier rules between Pascal and C:
- * 1. Pascal identifiers are case-insensitive, while C identifiers are case-sensitive
- * 2. C has reserved keywords that might conflict with Pascal identifiers
+ * 将Pascal标识符转换为C兼容的标识符
+ * 处理Pascal和C之间标识符规则的差异：
+ * 1. Pascal标识符大小写不敏感，而C标识符大小写敏感
+ * 2. C有可能与Pascal标识符冲突的保留关键字
  * 
- * @param pascalIdentifier The Pascal identifier to convert
- * @return A C-compatible identifier
+ * @param pascalIdentifier 要转换的Pascal标识符
+ * @return C兼容的标识符
  */
 std::string TranslatorUtils::toCIdentifier(const std::string& pascalIdentifier) {
-    // Convert Pascal identifiers to C identifiers
-    // In Pascal, identifiers are case-insensitive, in C they are case-sensitive
-    // We'll convert Pascal identifiers to lowercase in C to avoid issues
+    // 将Pascal标识符转换为C标识符
+    // 在Pascal中，标识符大小写不敏感，在C中它们大小写敏感
+    // 我们将Pascal标识符转换为小写以避免问题
 
     std::string result = pascalIdentifier;
 
-    // Convert to lowercase for consistency
+    // 为了一致性转换为小写
     std::transform(result.begin(), result.end(), result.begin(),
                    [](unsigned char c) { return std::tolower(c); });
 
-    // Check for C keywords and add underscore prefix if necessary
-    // This prevents conflicts with reserved words in C
+    // 检查C关键字并在必要时添加下划线前缀
+    // 这可以防止与C中的保留字冲突
     static const std::vector<std::string> cKeywords = {
             "auto", "break", "case", "char", "const", "continue", "default",
             "do", "double", "else", "enum", "extern", "float", "for", "goto",
@@ -77,51 +77,51 @@ std::string TranslatorUtils::toCIdentifier(const std::string& pascalIdentifier) 
 }
 
 /**
- * Escapes special characters in a string for C string literals
- * Ensures strings with special characters are properly escaped in the generated C code
+ * 转义字符串中的特殊字符，用于C字符串字面量
+ * 确保在生成的C代码中正确转义带有特殊字符的字符串
  * 
- * @param str The string to escape
- * @return The escaped string
+ * @param str 要转义的字符串
+ * @return 转义后的字符串
  */
 std::string TranslatorUtils::escapeString(const std::string& str) {
-    // Escape special characters in a string for C output
+    // 为C输出转义字符串中的特殊字符
     std::string result;
     for (char c : str) {
-        if (c == '\\') result += "\\\\";        // Backslash needs to be escaped
-        else if (c == '\"') result += "\\\"";   // Double quote needs to be escaped
-        else if (c == '\'') result += "\\\'";   // Single quote needs to be escaped
-        else if (c == '\n') result += "\\n";    // Newline needs to be escaped
-        else if (c == '\r') result += "\\r";    // Carriage return needs to be escaped
-        else if (c == '\t') result += "\\t";    // Tab needs to be escaped
-        else result += c;                        // Regular character, no escaping needed
+        if (c == '\\') result += "\\\\";        // 反斜杠需要转义
+        else if (c == '\"') result += "\\\"";   // 双引号需要转义
+        else if (c == '\'') result += "\\\'";   // 单引号需要转义
+        else if (c == '\n') result += "\\n";    // 换行符需要转义
+        else if (c == '\r') result += "\\r";    // 回车符需要转义
+        else if (c == '\t') result += "\\t";    // 制表符需要转义
+        else result += c;                        // 普通字符，无需转义
     }
     return result;
 }
 
 /**
- * Checks if a string is a valid identifier in both Pascal and C
- * Valid identifiers start with a letter or underscore and can contain
- * letters, digits, and underscores
+ * 检查字符串是否为Pascal和C中的有效标识符
+ * 有效标识符以字母或下划线开头，可以包含
+ * 字母、数字和下划线
  * 
- * @param str The string to check
- * @return true if the string is a valid identifier, false otherwise
+ * @param str 要检查的字符串
+ * @return 如果字符串是有效标识符则为true，否则为false
  */
 bool TranslatorUtils::isValidIdentifier(const std::string& str) {
-    // Check if a string is a valid identifier
-    // In both Pascal and C, identifiers must start with a letter or underscore
-    // and can contain letters, digits, and underscores
+    // 检查字符串是否为有效标识符
+    // 在Pascal和C中，标识符必须以字母或下划线开头
+    // 并且可以包含字母、数字和下划线
     
-    // Empty strings are not valid identifiers
+    // 空字符串不是有效标识符
     if (str.empty()) {
         return false;
     }
 
-    // First character must be a letter or underscore
+    // 第一个字符必须是字母或下划线
     if (!std::isalpha(str[0]) && str[0] != '_') {
         return false;
     }
 
-    // Remaining characters must be letters, digits, or underscores
+    // 其余字符必须是字母、数字或下划线
     return std::all_of(str.begin() + 1, str.end(), [](char c) {
         return std::isalnum(c) || c == '_';
     });

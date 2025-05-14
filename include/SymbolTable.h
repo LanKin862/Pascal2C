@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-// Symbol type enum to differentiate between various symbol types
+// 符号类型枚举，用于区分各种符号类型
 enum class SymbolType {
     VARIABLE,
     CONSTANT,
@@ -14,7 +14,7 @@ enum class SymbolType {
     PARAMETER
 };
 
-// Basic type enum for Pascal-S types
+// Pascal-S 类型的基本类型枚举
 enum class PascalType {
     INTEGER,
     REAL,
@@ -33,29 +33,29 @@ namespace std {
     };
 }
 
-// Struct to store array bounds information
+// 用于存储数组边界信息的结构体
 struct ArrayBounds {
     int lowerBound;
     int upperBound;
 };
 
-// Symbol entry for the symbol table
+// 符号表的符号条目
 struct SymbolEntry {
     std::string name;
     SymbolType symbolType;
     PascalType dataType;
-    bool isReference;                          // Used for VAR parameters
-    std::vector<ArrayBounds> arrayDimensions;  // For array types
-    PascalType arrayElementType;               // For array types, the type of elements
-    std::string value;                         // For constants
+    bool isReference;                          // 用于 VAR 参数
+    std::vector<ArrayBounds> arrayDimensions;  // 用于数组类型
+    PascalType arrayElementType;               // 用于数组类型，元素的类型
+    std::string value;                         // 用于常量
 };
 
-// Scope entry for the symbol table
+// 符号表的作用域条目
 class ScopeEntry {
   private:
     std::map<std::string, SymbolEntry> symbols;
     std::string scopeName;
-    std::vector<SymbolEntry> parameters;  // To store parameters in order of declaration
+    std::vector<SymbolEntry> parameters;  // 按声明顺序存储参数
 
   public:
     ScopeEntry(const std::string& name);
@@ -66,15 +66,15 @@ class ScopeEntry {
     std::map<std::string, SymbolEntry>& getSymbols();
     const std::map<std::string, SymbolEntry>& getSymbols() const;
     std::string getScopeName() const;
-    // Add parameter to ordered list (for procedures and functions)
+    // 将参数添加到有序列表（用于过程和函数）
     void addParameter(const SymbolEntry& param);
-    // Get parameters in order
+    // 按顺序获取参数
     const std::vector<SymbolEntry>& getParameters() const;
-    // Get mutable reference to parameters vector for modification
+    // 获取参数向量的可变引用以进行修改
     std::vector<SymbolEntry>& getParameters();
 };
 
-// Symbol table class to manage symbols and scopes
+// 符号表类，用于管理符号和作用域
 class SymbolTable {
   private:
     std::vector<std::unique_ptr<ScopeEntry>> scopes;
@@ -83,7 +83,7 @@ class SymbolTable {
   public:
     SymbolTable();
 
-    // Scope management
+    // 作用域管理
     void enterScope(const std::string& scopeName);
     void exitScope();
     bool isInGlobalScope() const;
@@ -92,7 +92,7 @@ class SymbolTable {
     bool hasScope(const std::string& scopeName) const;
     const ScopeEntry& getScope(const std::string& scopeName) const;
 
-    // Symbol management
+    // 符号管理
     bool addSymbol(const SymbolEntry& symbol);
     bool hasSymbolInCurrentScope(const std::string& name) const;
     bool hasSymbol(const std::string& name) const;

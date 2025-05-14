@@ -34,7 +34,7 @@ class PascalToCTranslator : public PascalSVisitor {
 
     std::string translate(const std::string &inputFile);
 
-    // Visitor implementation methods
+    // 访问者实现方法
     antlrcpp::Any visitProgram(PascalSParser::ProgramContext *context) override;
     antlrcpp::Any visitProgramStruct(PascalSParser::ProgramStructContext *context) override;
     antlrcpp::Any visitProgramHead(PascalSParser::ProgramHeadContext *context) override;
