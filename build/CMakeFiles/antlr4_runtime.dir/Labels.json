@@ -1,0 +1,43 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/mnt/d/ClionCode/Pascal2C/build/CMakeFiles/antlr4_runtime"
+		},
+		{
+			"file" : "/mnt/d/ClionCode/Pascal2C/build/CMakeFiles/antlr4_runtime.rule"
+		},
+		{
+			"file" : "/mnt/d/ClionCode/Pascal2C/build/CMakeFiles/antlr4_runtime-complete.rule"
+		},
+		{
+			"file" : "/mnt/d/ClionCode/Pascal2C/build/antlr4_runtime/src/antlr4_runtime-stamp/antlr4_runtime-build.rule"
+		},
+		{
+			"file" : "/mnt/d/ClionCode/Pascal2C/build/antlr4_runtime/src/antlr4_runtime-stamp/antlr4_runtime-configure.rule"
+		},
+		{
+			"file" : "/mnt/d/ClionCode/Pascal2C/build/antlr4_runtime/src/antlr4_runtime-stamp/antlr4_runtime-download.rule"
+		},
+		{
+			"file" : "/mnt/d/ClionCode/Pascal2C/build/antlr4_runtime/src/antlr4_runtime-stamp/antlr4_runtime-install.rule"
+		},
+		{
+			"file" : "/mnt/d/ClionCode/Pascal2C/build/antlr4_runtime/src/antlr4_runtime-stamp/antlr4_runtime-mkdir.rule"
+		},
+		{
+			"file" : "/mnt/d/ClionCode/Pascal2C/build/antlr4_runtime/src/antlr4_runtime-stamp/antlr4_runtime-patch.rule"
+		},
+		{
+			"file" : "/mnt/d/ClionCode/Pascal2C/build/antlr4_runtime/src/antlr4_runtime-stamp/antlr4_runtime-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"antlr4_runtime"
+		],
+		"name" : "antlr4_runtime"
+	}
+}

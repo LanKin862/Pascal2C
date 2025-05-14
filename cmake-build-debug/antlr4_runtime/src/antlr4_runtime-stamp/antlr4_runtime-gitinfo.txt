@@ -1,0 +1,15 @@
+# This is a generated file and its contents are an internal implementation detail.
+# The download step will be re-executed if anything in this file changes.
+# No other meaning or use of this file is supported.
+
+method=git
+command=D:/Program Files/JetBrains/CLion 2023.3.4/bin/cmake/win/x64/bin/cmake.exe;-P;D:/ClionCode/Pascal2C/cmake-build-debug/antlr4_runtime/tmp/antlr4_runtime-gitclone.cmake
+source_dir=D:/ClionCode/Pascal2C/cmake-build-debug/antlr4_runtime/src/antlr4_runtime
+work_dir=D:/ClionCode/Pascal2C/cmake-build-debug/antlr4_runtime/src
+repository=https://gitee.com/cyy862/antlr4.git
+remote=origin
+init_submodules=TRUE
+recurse_submodules=--recursive
+submodules=
+CMP0097=NEW
+

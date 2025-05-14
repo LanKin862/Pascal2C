@@ -1,0 +1,22 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "D:/ClionCode/Pascal2C/cmake-build-debug/CMakeFiles/antlr4_runtime-build_static"
+		},
+		{
+			"file" : "D:/ClionCode/Pascal2C/cmake-build-debug/CMakeFiles/antlr4_runtime-build_static.rule"
+		},
+		{
+			"file" : "D:/ClionCode/Pascal2C/cmake-build-debug/antlr4_runtime/src/antlr4_runtime-stamp/antlr4_runtime-build_static.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"antlr4_runtime"
+		],
+		"name" : "antlr4_runtime-build_static"
+	}
+}

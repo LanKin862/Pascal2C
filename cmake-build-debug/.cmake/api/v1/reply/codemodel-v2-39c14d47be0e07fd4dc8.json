@@ -1,0 +1,87 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"jsonFile" : "directory-.-Debug-d0094a50bb2071803777.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.25"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "Pascal2C",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "antlr4_runtime::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-antlr4_runtime-Debug-920266c9489b70c31474.json",
+					"name" : "antlr4_runtime",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "antlr4_runtime-build_shared::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-antlr4_runtime-build_shared-Debug-89d82881c5d722e3467f.json",
+					"name" : "antlr4_runtime-build_shared",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "antlr4_runtime-build_static::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-antlr4_runtime-build_static-Debug-16d001b02696daae6935.json",
+					"name" : "antlr4_runtime-build_static",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "pascc::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-pascc-Debug-5437b2367e03a75c2088.json",
+					"name" : "pascc",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "D:/ClionCode/Pascal2C/cmake-build-debug",
+		"source" : "D:/ClionCode/Pascal2C"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 6
+	}
+}
