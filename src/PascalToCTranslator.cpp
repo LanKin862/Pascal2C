@@ -137,7 +137,7 @@ antlrcpp::Any PascalToCTranslator::visitProgramHead(PascalSParser::ProgramHeadCo
     std::string programName = context->ID()->getText();
 
     // 在C代码中添加程序名称作为注释
-    output << "// 程序: " << programName << "\n\n";
+    output << "// Program: " << programName << "\n\n";
 
     return antlrcpp::Any();
 }
@@ -527,29 +527,33 @@ antlrcpp::Any PascalToCTranslator::visitBasicType(PascalSParser::BasicTypeContex
  */
 antlrcpp::Any PascalToCTranslator::visitPeriod(PascalSParser::PeriodContext *context) {
     std::vector<ArrayBounds> dimensions;
-    std::vector<std::string> numStrings;
+    std::vector<std::pair<std::string, std::string>> numStrings;
     std::string periodStr = context->getText();
 
     // 提取所有由DOTDOT（..）分隔的数字对
-    std::regex pattern(R"((\d+)\.\.(\d+))");  // 匹配 "数字..数字"
+    std::regex pattern(R"((\d+(\.\d+)?)\.\.(\d+(\.\d+)?))");  // 匹配 "数字..数字"
     std::smatch matches;
 
     auto begin = periodStr.cbegin();
     auto end = periodStr.cend();
 
     while (std::regex_search(begin, end, matches, pattern)) {
-        numStrings.push_back(matches[1].str());  // 下界（如 "1"）
-        numStrings.push_back(matches[2].str());  // 上界（如 "4"）
+        numStrings.push_back(std::make_pair(matches[1].str(), matches[3].str()));  // 下界（如 "1"）
         begin = matches[0].second;           // 继续匹配剩余部分
     }
     // 将边界转换为整数并存储在ArrayBounds结构中
-    for (int i = 0; i < numStrings.size(); i+=2) {
-        if (i + 1 < numStrings.size()) {
-            ArrayBounds bounds;
-            bounds.lowerBound = std::stoi(numStrings[i]);
-            bounds.upperBound = std::stoi(numStrings[i+1]);
-            dimensions.push_back(bounds);
+    for (int i = 0; i < numStrings.size(); i++) {
+        ArrayBounds bounds;
+        bounds.lowerBound = std::stoi(numStrings[i].first);
+        bounds.upperBound = std::stoi(numStrings[i].second);
+        std::smatch tmpMatches;
+        std::regex tmpPattern(R"(\.)");
+        if (std::regex_search(numStrings[i].first, tmpMatches, tmpPattern) || std::regex_search(numStrings[i].second, tmpMatches, tmpPattern)) {
+            std::cout << "----------------------------------------------------------" << std::endl;
+            std::cout << "警告：数组索引不合法" << "，行：" << context->start->getLine() << std::endl;
+            std::cout << "----------------------------------------------------------" << std::endl;
         }
+        dimensions.push_back(bounds);
     }
     return dimensions;
 }
@@ -1101,7 +1105,7 @@ antlrcpp::Any PascalToCTranslator::visitStatement(PascalSParser::StatementContex
         std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
         if(!symbolTable->hasSymbol(id)){
             std::cout << "----------------------------------------------------------" << std::endl;
-            std::cout << "错误：未定义的变量 " << id << " 在 " << symbolTable->getCurrentScope().getScopeName() << "，行：" << context->start->getLine() << std::endl;
+            std::cout << "警告：未定义的变量 " << id << " 在 " << symbolTable->getCurrentScope().getScopeName() << "，行：" << context->start->getLine() << std::endl;
             std::cout << "----------------------------------------------------------" << std::endl;
         }
 
@@ -1110,6 +1114,24 @@ antlrcpp::Any PascalToCTranslator::visitStatement(PascalSParser::StatementContex
 
         // 获取当前作用域名称 - 如果我们赋值给同名函数，则是返回值赋值
         std::string currentScopeName = symbolTable->getCurrentScope().getScopeName();
+
+        // 类型检查
+        if (symbolTable->hasSymbol(id)) {
+            const SymbolEntry& leftEntry = symbolTable->getSymbol(id);
+            PascalType leftType = leftEntry.dataType;
+            
+            // 尝试获取表达式的类型
+            PascalType rightType = inferExpressionType(expr);
+            
+            // 检查类型是否匹配
+            if (!areTypesCompatible(leftType, rightType)) {
+                std::cout << "----------------------------------------------------------" << std::endl;
+                std::cout << "警告：类型不匹配 - 将 " << pascalTypeToString(rightType) 
+                          << " 类型的值赋给 " << pascalTypeToString(leftType) 
+                          << " 类型的变量 " << id << "，行：" << context->start->getLine() << std::endl;
+                std::cout << "----------------------------------------------------------" << std::endl;
+            }
+        }
 
         if (currentScopeName == id) {
             // 这是函数结果赋值（Pascal函数:=值）
@@ -1133,6 +1155,25 @@ antlrcpp::Any PascalToCTranslator::visitStatement(PascalSParser::StatementContex
                     auto exprResult = visit(context->expression());
                     std::string expr = exprResult.as<std::string>();
                     
+                    // 类型检查
+                    if (symbolTable->hasSymbol(pair.second)) {
+                        const SymbolEntry& leftEntry = symbolTable->getSymbol(pair.second);
+                        PascalType leftType = leftEntry.dataType;
+                        
+                        // 尝试获取表达式的类型
+                        PascalType rightType = inferExpressionType(expr);
+                        
+                        // 检查类型是否匹配
+                        if (!areTypesCompatible(leftType, rightType)) {
+                            std::cout << "----------------------------------------------------------" << std::endl;
+                            std::cout << "警告：类型不匹配 - 将 " << pascalTypeToString(rightType) 
+                                      << " 类型的值赋给函数 " << pair.second << " 的 " 
+                                      << pascalTypeToString(leftType) << " 类型的返回值，行：" 
+                                      << context->start->getLine() << std::endl;
+                            std::cout << "----------------------------------------------------------" << std::endl;
+                        }
+                    }
+                    
                     // 赋值给函数的tmp变量而不是直接返回
                     output << getCurrentIndentation() << pair.second << "tmp = " << expr << ";\n";
                     return antlrcpp::Any();
@@ -1148,6 +1189,38 @@ antlrcpp::Any PascalToCTranslator::visitStatement(PascalSParser::StatementContex
             std::string var = varResult.as<std::string>();
             auto exprResult = visit(context->expression());
             std::string expr = exprResult.as<std::string>();
+
+            // 类型检查
+            // 从变量名中提取基本变量名（去除数组索引）
+            std::string baseVar = var;
+            size_t bracketPos = var.find('[');
+            if (bracketPos != std::string::npos) {
+                baseVar = var.substr(0, bracketPos);
+            }
+
+            if (symbolTable->hasSymbol(baseVar)) {
+                const SymbolEntry& leftEntry = symbolTable->getSymbol(baseVar);
+                PascalType leftType;
+                
+                // 如果是数组访问，使用数组元素类型
+                if (leftEntry.dataType == PascalType::ARRAY && bracketPos != std::string::npos) {
+                    leftType = leftEntry.arrayElementType;
+                } else {
+                    leftType = leftEntry.dataType;
+                }
+                
+                // 尝试获取表达式的类型
+                PascalType rightType = inferExpressionType(expr);
+                
+                // 检查类型是否匹配
+                if (!areTypesCompatible(leftType, rightType)) {
+                    std::cout << "----------------------------------------------------------" << std::endl;
+                    std::cout << "警告：类型不匹配 - 将 " << pascalTypeToString(rightType) 
+                              << " 类型的值赋给 " << pascalTypeToString(leftType) 
+                              << " 类型的变量 " << var << "，行：" << context->start->getLine() << std::endl;
+                    std::cout << "----------------------------------------------------------" << std::endl;
+                }
+            }
 
             output << getCurrentIndentation() << var << " = " << expr << ";\n";
         } catch (const std::bad_cast& e) {
@@ -1432,7 +1505,7 @@ antlrcpp::Any PascalToCTranslator::visitWriteStatement(PascalSParser::WriteState
                 }
             }else {
                 std::cout << "----------------------------------------------------------" << std::endl;
-                std::cout << "错误：未定义的变量 " << baseVar << " 在 " << symbolTable->getCurrentScope().getScopeName()
+                std::cout << "警告：未定义的变量 " << baseVar << " 在 " << symbolTable->getCurrentScope().getScopeName()
                           << "，行：" << context->start->getLine() << std::endl;
                 std::cout << "----------------------------------------------------------" << std::endl;
             }
@@ -1533,7 +1606,7 @@ antlrcpp::Any PascalToCTranslator::visitVariable(PascalSParser::VariableContext 
     }
     else {
         std::cout << "----------------------------------------------------------" << std::endl;
-        std::cout << "错误：未定义的变量 " << id << " 在 " << symbolTable->getCurrentScope().getScopeName()
+        std::cout << "警告：未定义的变量 " << id << " 在 " << symbolTable->getCurrentScope().getScopeName()
                   << "，行：" << context->start->getLine() << std::endl;
         std::cout << "----------------------------------------------------------" << std::endl;
     }
@@ -1598,134 +1671,8 @@ antlrcpp::Any PascalToCTranslator::visitProcedureCall(PascalSParser::ProcedureCa
 
     // 检查是否是带参数的过程调用
     if (context->expressionList()) {
-        auto result = visit(context->expressionList());
-        std::vector<std::string> args = result.as<std::vector<std::string>>();
+        return visitFunction_Procedure(context);
 
-        // 格式化带参数的过程调用
-        std::stringstream ss;
-        ss << id << "(";
-
-        // 如果可用，获取过程定义以检查引用参数
-        bool hasProcedureSymbol = symbolTable->hasSymbol(id);
-        std::vector<SymbolEntry> parameters;
-
-        if (hasProcedureSymbol) {
-            // 获取此过程的参数
-            if (symbolTable->hasScope(id)) {
-                const ScopeEntry& scope = symbolTable->getScope(id);
-                parameters = scope.getParameters();
-
-                // 调试输出以验证参数
-                TranslatorUtils::logDebug("过程 " + id + " 参数：");
-                for (size_t i = 0; i < parameters.size(); ++i) {
-                    TranslatorUtils::logDebug("  参数 " + std::to_string(i) + ": " + parameters[i].name +
-                                             ", 是否引用: " + (parameters[i].isReference ? "true" : "false"));
-                }
-            }
-        }
-
-        for (size_t i = 0; i < args.size(); ++i) {
-            if (i > 0) {
-                ss << ", ";
-            }
-
-            // 检查此参数是否应通过引用传递
-            bool isReferenceParam = false;
-            bool isArrayType = false;
-            bool isMultidimensionalArray = false;
-
-            // 修复参数排序问题：作用域参数列表中的参数
-            // 与它们在Pascal源代码中的出现顺序相反。
-            // 需要反转索引以匹配正确的参数。
-            if (parameters.size() == args.size()) {
-                // 计算正确的参数索引（参数按相反顺序）
-                size_t paramIndex = parameters.size() - 1 - i;
-
-                isReferenceParam = parameters[paramIndex].isReference;
-
-                // 调试输出以验证引用参数检测
-                TranslatorUtils::logDebug("  检查参数 " + std::to_string(i) + ": " + args[i] +
-                                         ", 是否引用: " + (isReferenceParam ? "true" : "false") +
-                                         ", 参数索引: " + std::to_string(paramIndex));
-
-                // 检查参数是否为数组
-                std::string argBase = args[i];
-                size_t bracketPos = argBase.find('[');
-                size_t parenPos = argBase.find('(');
-
-                // 如果有数组索引或函数调用，提取基本变量名
-                if (bracketPos != std::string::npos) {
-                    argBase = argBase.substr(0, bracketPos);
-                } else if (parenPos != std::string::npos) {
-                    argBase = argBase.substr(0, parenPos);
-                }
-
-                // 检查参数是否为数组，以及是否为多维数组
-                if (symbolTable->hasSymbol(argBase)) {
-                    const SymbolEntry& argEntry = symbolTable->getSymbol(argBase);
-                    isArrayType = (argEntry.dataType == PascalType::ARRAY);
-                    isMultidimensionalArray = (isArrayType && argEntry.arrayDimensions.size() > 1);
-
-                    TranslatorUtils::logDebug("    参数 " + argBase + " 是数组: " + (isArrayType ? "true" : "false") +
-                                             ", 是多维数组: " + (isMultidimensionalArray ? "true" : "false") +
-                                             ", 维度: " + std::to_string(argEntry.arrayDimensions.size()));
-                }
-
-                // 区别处理普通数组和多维数组
-                if (isArrayType) {
-                    // 如果是数组索引操作，我们需要检查是否传递数组的一部分
-                    if (args[i].find('[') != std::string::npos) {
-                        // 计算原始数组中的维度数与数组访问中的维度数
-                        int accessedDimensions = 0;
-                        size_t pos = 0;
-                        while ((pos = args[i].find('[', pos)) != std::string::npos) {
-                            accessedDimensions++;
-                            pos++;
-                        }
-
-                        // 如果将参数用作数组，检查维度
-                        bool isFullyIndexed = false;
-                        if (symbolTable->hasSymbol(argBase)) {
-                            const SymbolEntry& argEntry = symbolTable->getSymbol(argBase);
-                            isFullyIndexed = (accessedDimensions >= argEntry.arrayDimensions.size());
-                        }
-
-                        // 如果我们传递的是一部分或参数期望一个数组
-                        if (!isFullyIndexed) {
-                            // 直接传递数组元素（它是多维数组的一部分）
-                            ss << args[i];
-                        } else {
-                            // 传递完全索引的元素（如果是VAR参数，可能需要&）
-                            if (isReferenceParam) {
-                                ss << "(&(" << args[i] << "))";
-                            } else {
-                                ss << args[i];
-                            }
-                        }
-                    } else {
-                        // 传递整个数组 - 不需要&，因为数组默认通过引用传递
-                        ss << args[i];
-                    }
-                }
-                // 对于通过引用传递的非数组参数
-                else if (isReferenceParam) {
-                    ss << "(&(" << args[i] << "))";
-                    TranslatorUtils::logDebug("  添加&到 " + args[i]);
-                } else {
-                    // 常规值参数
-                    ss << args[i];
-                }
-                std::cout << "参数:" << args[i] << std::endl;
-            } else {
-                // 如果无法匹配参数，按原样传递参数
-                ss << args[i];
-                std::cout << "无法匹配参数，参数:" << args[i] << std::endl;
-            }
-        }
-
-        ss << ")";
-
-        return ss.str();
     }
 
     // 无参数的过程调用
@@ -1904,144 +1851,7 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
     }
     // 函数调用
     else if (context->ID() && context->expressionList()) {
-        std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
-
-        if(!symbolTable->hasSymbol(id)){
-            std::cout << "----------------------------------------------------------" << std::endl;
-            std::cout << "错误：未定义的变量 " << id << " 在 "
-                      << symbolTable->getCurrentScope().getScopeName() << "，行：" << context->start->getLine()
-                      << std::endl;
-            std::cout << "----------------------------------------------------------" << std::endl;
-        }
-
-        auto result = visit(context->expressionList());
-        std::vector<std::string> args = result.as<std::vector<std::string>>();
-
-        // 格式化函数调用
-        std::stringstream ss;
-        ss << id << "(";
-
-        // 如果可用，获取函数定义以检查引用参数
-        bool hasFunctionSymbol = symbolTable->hasSymbol(id);
-        std::vector<SymbolEntry> parameters;
-
-        if (hasFunctionSymbol) {
-            // 获取此函数的参数
-            if (symbolTable->hasScope(id)) {
-                const ScopeEntry& scope = symbolTable->getScope(id);
-                parameters = scope.getParameters();
-
-                // 调试输出以验证参数
-                TranslatorUtils::logDebug("函数 " + id + " 参数：");
-                for (size_t i = 0; i < parameters.size(); ++i) {
-                    TranslatorUtils::logDebug("  参数 " + std::to_string(i) + ": " + parameters[i].name +
-                                             ", 是否引用: " + (parameters[i].isReference ? "true" : "false"));
-                }
-            }
-        }
-
-        for (size_t i = 0; i < args.size(); ++i) {
-            if (i > 0) {
-                ss << ", ";
-            }
-
-            // 检查此参数是否应通过引用传递
-            bool isReferenceParam = false;
-            bool isArrayType = false;
-            bool isMultidimensionalArray = false;
-
-            // 修复参数排序问题：作用域参数列表中的参数
-            // 与它们在Pascal源代码中的出现顺序相反。
-            // 需要反转索引以匹配正确的参数。
-            if (parameters.size() == args.size()) {
-                // 计算正确的参数索引（参数按相反顺序）
-                size_t paramIndex = parameters.size() - 1 - i;
-
-                isReferenceParam = parameters[paramIndex].isReference;
-
-                // 调试输出以验证引用参数检测
-                TranslatorUtils::logDebug("  检查参数 " + std::to_string(i) + ": " + args[i] +
-                                         ", 是否引用: " + (isReferenceParam ? "true" : "false") +
-                                         ", 参数索引: " + std::to_string(paramIndex));
-
-                // 检查参数是否为数组
-                std::string argBase = args[i];
-                size_t bracketPos = argBase.find('[');
-                size_t parenPos = argBase.find('(');
-
-                // 如果有数组索引或函数调用，提取基本变量名
-                if (bracketPos != std::string::npos) {
-                    argBase = argBase.substr(0, bracketPos);
-                } else if (parenPos != std::string::npos) {
-                    argBase = argBase.substr(0, parenPos);
-                }
-
-                // 检查参数是否为数组，以及是否为多维数组
-                if (symbolTable->hasSymbol(argBase)) {
-                    const SymbolEntry& argEntry = symbolTable->getSymbol(argBase);
-                    isArrayType = (argEntry.dataType == PascalType::ARRAY);
-                    isMultidimensionalArray = (isArrayType && argEntry.arrayDimensions.size() > 1);
-
-                    TranslatorUtils::logDebug("    参数 " + argBase + " 是数组: " + (isArrayType ? "true" : "false") +
-                                             ", 是多维数组: " + (isMultidimensionalArray ? "true" : "false") +
-                                             ", 维度: " + std::to_string(argEntry.arrayDimensions.size()));
-                }
-
-                // 区别处理普通数组和多维数组
-                if (isArrayType) {
-                    // 如果是数组索引操作，我们需要检查是否传递数组的一部分
-                    if (args[i].find('[') != std::string::npos) {
-                        // 计算原始数组中的维度数与数组访问中的维度数
-                        int accessedDimensions = 0;
-                        size_t pos = 0;
-                        while ((pos = args[i].find('[', pos)) != std::string::npos) {
-                            accessedDimensions++;
-                            pos++;
-                        }
-
-                        // 如果将参数用作数组，检查维度
-                        bool isFullyIndexed = false;
-                        if (symbolTable->hasSymbol(argBase)) {
-                            const SymbolEntry& argEntry = symbolTable->getSymbol(argBase);
-                            isFullyIndexed = (accessedDimensions >= argEntry.arrayDimensions.size());
-                        }
-
-                        // 如果我们传递的是一部分或参数期望一个数组
-                        if (!isFullyIndexed) {
-                            // 直接传递数组元素（它是多维数组的一部分）
-                            ss << args[i];
-                        } else {
-                            // 传递完全索引的元素（如果是VAR参数，可能需要&）
-                            if (isReferenceParam) {
-                                ss << "(&(" << args[i] << "))";
-                            } else {
-                                ss << args[i];
-                            }
-                        }
-                    } else {
-                        // 传递整个数组 - 不需要&，因为数组默认通过引用传递
-                        ss << args[i];
-                    }
-                }
-                // 对于通过引用传递的非数组参数
-                else if (isReferenceParam) {
-                    ss << "(&(" << args[i] << "))";
-                    TranslatorUtils::logDebug("  添加&到 " + args[i]);
-                } else {
-                    // 常规值参数
-                    ss << args[i];
-                }
-            } else {
-                // 如果无法匹配参数，按原样传递参数
-                ss << args[i];
-                std::cout << "无法匹配参数，参数:" << args[i] << std::endl;
-            }
-        }
-
-        ss << ")";
-        std::cout << "function call :" << ss.str() << std::endl;
-
-        return ss.str();
+        return visitFunction_Procedure(context);
     }
     // 无括号的函数调用（用于没有参数的Pascal函数）
     else if (context->ID() && !context->expressionList()) {
@@ -2049,7 +1859,7 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
 
         if(!symbolTable->hasSymbol(id)){
             std::cout << "----------------------------------------------------------" << std::endl;
-            std::cout << "错误：未定义的变量 " << id << " 在 "
+            std::cout << "警告：未定义的变量 " << id << " 在 "
                       << symbolTable->getCurrentScope().getScopeName() << "，行：" << context->start->getLine()
                       << std::endl;
             std::cout << "----------------------------------------------------------" << std::endl;
@@ -2092,7 +1902,7 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
         std::string factor = result.as<std::string>();
         if(!((factor[0]>='0' && factor[0]<='9') || factor[0]=='(' || factor[0]=='-' || factor[0]=='~' ||factor[0]=='+') && (!symbolTable->hasSymbol(factor))) {
             std::cout << "----------------------------------------------------------" << std::endl;
-            std::cout << "错误：未定义的变量 " << factor << " 在 "
+            std::cout << "警告：未定义的变量 " << factor << " 在 "
                       << symbolTable->getCurrentScope().getScopeName() << "，行：" << context->start->getLine()
                       << std::endl;
             std::cout << "----------------------------------------------------------" << std::endl;
@@ -2105,7 +1915,7 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
         std::string factor = result.as<std::string>();
         if(!((factor[0]>='0' && factor[0]<='9') || factor[0]=='(' || factor[0]=='-' || factor[0]=='~' ||factor[0]=='+') && (!symbolTable->hasSymbol(factor))) {
             std::cout << "----------------------------------------------------------" << std::endl;
-            std::cout << "错误：未定义的变量 " << factor << " 在 "
+            std::cout << "警告：未定义的变量 " << factor << " 在 "
                       << symbolTable->getCurrentScope().getScopeName() << "，行：" << context->start->getLine()
                       << std::endl;
             std::cout << "----------------------------------------------------------" << std::endl;
@@ -2118,7 +1928,7 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
         auto result = visit(context->factor());        std::string factor = result.as<std::string>();
         if(!((factor[0]>='0' && factor[0]<='9') || factor[0]=='(' || factor[0]=='-' || factor[0]=='~' ||factor[0]=='+') && (!symbolTable->hasSymbol(factor))) {
             std::cout << "----------------------------------------------------------" << std::endl;
-            std::cout << "错误：未定义的变量 " << factor << " 在 "
+            std::cout << "警告：未定义的变量 " << factor << " 在 "
                       << symbolTable->getCurrentScope().getScopeName() << "，行：" << context->start->getLine()
                       << std::endl;
             std::cout << "----------------------------------------------------------" << std::endl;
@@ -2207,4 +2017,258 @@ antlrcpp::Any PascalToCTranslator::visitMulop(PascalSParser::MulopContext *conte
 
     return antlrcpp::Any(std::string(""));
 }
+
+/**
+ * 推断表达式的类型
+ * @param expr 表达式字符串
+ * @return 推断的Pascal类型
+ */
+PascalType PascalToCTranslator::inferExpressionType(const std::string& expr) {
+    // 检查是否为数字字面量
+    if (std::regex_match(expr, std::regex("^[+-]?\\d+$"))) {
+        return PascalType::INTEGER;
+    }
+    
+    // 检查是否为浮点数字面量
+    if (std::regex_match(expr, std::regex("^[+-]?\\d+\\.\\d*$"))) {
+        return PascalType::REAL;
+    }
+    
+    // 检查是否为布尔字面量
+    if (expr == "true" || expr == "false" || expr == "1" || expr == "0" || expr == "~(0)" || expr == "~(1)") {
+        return PascalType::BOOLEAN;
+    }
+    
+    // 检查是否为字符字面量
+    if (expr.size() >= 2 && expr[0] == '\'' && expr.back() == '\'') {
+        return PascalType::CHAR;
+    }
+    
+    // 检查是否为字符串字面量
+    if (expr.size() >= 2 && ((expr[0] == '\'' && expr.back() == '\'') || 
+                            (expr[0] == '\"' && expr.back() == '\"'))) {
+        return PascalType::STRING;
+    }
+    
+    // 检查是否为变量或函数调用
+    std::string baseExpr = expr;
+    size_t bracketPos = expr.find('[');
+    size_t parenPos = expr.find('(');
+    
+    // 提取基本变量名或函数名
+    if (bracketPos != std::string::npos) {
+        baseExpr = expr.substr(0, bracketPos);
+    } else if (parenPos != std::string::npos) {
+        baseExpr = expr.substr(0, parenPos);
+    }
+    
+    // 在符号表中查找变量或函数
+    if (symbolTable->hasSymbol(baseExpr)) {
+        const SymbolEntry& entry = symbolTable->getSymbol(baseExpr);
+        
+        if (entry.dataType == PascalType::ARRAY && bracketPos != std::string::npos) {
+            // 数组访问，返回元素类型
+            return entry.arrayElementType;
+        } else {
+            // 变量或函数，返回其类型
+            return entry.dataType;
+        }
+    }
+    
+    // 如果无法确定类型，默认为INTEGER
+    return PascalType::INTEGER;
+}
+
+/**
+ * 检查两个类型是否兼容（可以赋值）
+ * @param leftType 左侧（目标）类型
+ * @param rightType 右侧（源）类型
+ * @return 如果类型兼容则返回true
+ */
+bool PascalToCTranslator::areTypesCompatible(PascalType leftType, PascalType rightType) {
+    // 相同类型总是兼容的
+    if (leftType == rightType) {
+        return true;
+    }
+    
+    // INTEGER 可以赋值给 REAL
+    if (leftType == PascalType::REAL && rightType == PascalType::INTEGER) {
+        return true;
+    }
+    
+    // CHAR 可以赋值给 STRING
+    if (leftType == PascalType::STRING && rightType == PascalType::CHAR) {
+        return true;
+    }
+    
+    // 其他类型组合不兼容
+    return false;
+}
+
+/**
+ * 将PascalType枚举转换为可读的字符串
+ * @param type Pascal类型
+ * @return 类型的字符串表示
+ */
+std::string PascalToCTranslator::pascalTypeToString(PascalType type) {
+    switch (type) {
+        case PascalType::INTEGER: return "INTEGER";
+        case PascalType::REAL: return "REAL";
+        case PascalType::BOOLEAN: return "BOOLEAN";
+        case PascalType::CHAR: return "CHAR";
+        case PascalType::STRING: return "STRING";
+        case PascalType::ARRAY: return "ARRAY";
+        default: return "UNKNOWN";
+    }
+}
+
+
+template<typename T>
+antlrcpp::Any PascalToCTranslator::visitFunction_Procedure(T *context) {
+    std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
+
+    if(!symbolTable->hasSymbol(id)){
+        std::cout << "----------------------------------------------------------" << std::endl;
+        std::cout << "警告：未定义的变量 " << id << " 在 "
+                  << symbolTable->getCurrentScope().getScopeName() << "，行：" << context->start->getLine()
+                  << std::endl;
+        std::cout << "----------------------------------------------------------" << std::endl;
+    }
+
+    auto result = visit(context->expressionList());
+    std::vector<std::string> args = result.template as<std::vector<std::string>>();
+
+    // 格式化函数调用
+    std::stringstream ss;
+    ss << id << "(";
+
+    // 如果可用，获取函数定义以检查引用参数
+    bool hasFunctionSymbol = symbolTable->hasSymbol(id);
+    std::vector<SymbolEntry> parameters;
+
+    if (hasFunctionSymbol) {
+        // 获取此函数的参数
+        if (symbolTable->hasScope(id)) {
+            const ScopeEntry& scope = symbolTable->getScope(id);
+            parameters = scope.getParameters();
+
+            if(args.size() != parameters.size()) {
+                std::cout << "----------------------------------------------------------" << std::endl;
+                std::cout << "警告：函数调用时实参与形参的数量不匹配 :" << id << "，行：" << context->start->getLine() << std::endl;
+                std::cout << "----------------------------------------------------------" << std::endl;
+            }
+
+            // 调试输出以验证参数
+            TranslatorUtils::logDebug("函数 " + id + " 参数：");
+            for (size_t i = 0; i < parameters.size(); ++i) {
+                TranslatorUtils::logDebug("  参数 " + std::to_string(i) + ": " + parameters[i].name +
+                                          ", 是否引用: " + (parameters[i].isReference ? "true" : "false"));
+            }
+        }
+    }
+
+    for (size_t i = 0; i < args.size(); ++i) {
+        if (i > 0) {
+            ss << ", ";
+        }
+
+        // 检查此参数是否应通过引用传递
+        bool isReferenceParam = false;
+        bool isArrayType = false;
+        bool isMultidimensionalArray = false;
+
+        // 修复参数排序问题：作用域参数列表中的参数
+        // 与它们在Pascal源代码中的出现顺序相反。
+        // 需要反转索引以匹配正确的参数。
+        if (parameters.size() == args.size()) {
+            // 计算正确的参数索引（参数按相反顺序）
+            size_t paramIndex = parameters.size() - 1 - i;
+
+            isReferenceParam = parameters[paramIndex].isReference;
+
+            // 调试输出以验证引用参数检测
+            TranslatorUtils::logDebug("  检查参数 " + std::to_string(i) + ": " + args[i] +
+                                      ", 是否引用: " + (isReferenceParam ? "true" : "false") +
+                                      ", 参数索引: " + std::to_string(paramIndex));
+
+            // 检查参数是否为数组
+            std::string argBase = args[i];
+            size_t bracketPos = argBase.find('[');
+            size_t parenPos = argBase.find('(');
+
+            // 如果有数组索引或函数调用，提取基本变量名
+            if (bracketPos != std::string::npos) {
+                argBase = argBase.substr(0, bracketPos);
+            } else if (parenPos != std::string::npos) {
+                argBase = argBase.substr(0, parenPos);
+            }
+
+            // 检查参数是否为数组，以及是否为多维数组
+            if (symbolTable->hasSymbol(argBase)) {
+                const SymbolEntry& argEntry = symbolTable->getSymbol(argBase);
+                isArrayType = (argEntry.dataType == PascalType::ARRAY);
+                isMultidimensionalArray = (isArrayType && argEntry.arrayDimensions.size() > 1);
+
+                TranslatorUtils::logDebug("    参数 " + argBase + " 是数组: " + (isArrayType ? "true" : "false") +
+                                          ", 是多维数组: " + (isMultidimensionalArray ? "true" : "false") +
+                                          ", 维度: " + std::to_string(argEntry.arrayDimensions.size()));
+            }
+
+            // 区别处理普通数组和多维数组
+            if (isArrayType) {
+                // 如果是数组索引操作，我们需要检查是否传递数组的一部分
+                if (args[i].find('[') != std::string::npos) {
+                    // 计算原始数组中的维度数与数组访问中的维度数
+                    int accessedDimensions = 0;
+                    size_t pos = 0;
+                    while ((pos = args[i].find('[', pos)) != std::string::npos) {
+                        accessedDimensions++;
+                        pos++;
+                    }
+
+                    // 如果将参数用作数组，检查维度
+                    bool isFullyIndexed = false;
+                    if (symbolTable->hasSymbol(argBase)) {
+                        const SymbolEntry& argEntry = symbolTable->getSymbol(argBase);
+                        isFullyIndexed = (accessedDimensions >= argEntry.arrayDimensions.size());
+                    }
+
+                    // 如果我们传递的是一部分或参数期望一个数组
+                    if (!isFullyIndexed) {
+                        // 直接传递数组元素（它是多维数组的一部分）
+                        ss << args[i];
+                    } else {
+                        // 传递完全索引的元素（如果是VAR参数，可能需要&）
+                        if (isReferenceParam) {
+                            ss << "(&(" << args[i] << "))";
+                        } else {
+                            ss << args[i];
+                        }
+                    }
+                } else {
+                    // 传递整个数组 - 不需要&，因为数组默认通过引用传递
+                    ss << args[i];
+                }
+            }
+                // 对于通过引用传递的非数组参数
+            else if (isReferenceParam) {
+                ss << "(&(" << args[i] << "))";
+                TranslatorUtils::logDebug("  添加&到 " + args[i]);
+            } else {
+                // 常规值参数
+                ss << args[i];
+            }
+        } else {
+            // 如果无法匹配参数，按原样传递参数
+            ss << args[i];
+            std::cout << "无法匹配参数，参数:" << args[i] << std::endl;
+        }
+    }
+
+    ss << ")";
+
+    return ss.str();
+}
+
+
 

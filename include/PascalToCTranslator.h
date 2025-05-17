@@ -27,6 +27,14 @@ class PascalToCTranslator : public PascalSVisitor {
     std::string getCurrentIndentation() const;
     std::string getNextTempVar();
     void generateForwardDeclarations(PascalSParser::SubprogramDeclarationsContext *context);
+    
+    // 类型检查相关函数
+    PascalType inferExpressionType(const std::string& expr);
+    bool areTypesCompatible(PascalType leftType, PascalType rightType);
+    std::string pascalTypeToString(PascalType type);
+
+    template<typename T>
+    antlrcpp::Any visitFunction_Procedure(T *context);
 
   public:
     PascalToCTranslator();
