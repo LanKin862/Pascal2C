@@ -31,7 +31,9 @@ class PascalToCTranslator : public PascalSVisitor {
     // 类型检查相关函数
     PascalType inferExpressionType(const std::string& expr);
     bool areTypesCompatible(PascalType leftType, PascalType rightType);
+    bool areTypesForComparisonCompatible(PascalType leftType, PascalType rightType);
     std::string pascalTypeToString(PascalType type);
+    size_t findOperatorPosition(const std::string& expr, const std::string& op);
 
     template<typename T>
     antlrcpp::Any visitFunction_Procedure(T *context);
