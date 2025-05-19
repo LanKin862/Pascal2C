@@ -3,6 +3,9 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <memory>
+#include "SymbolTable.h"
+
 
 // 翻译器错误的异常类
 class TranslatorException : public std::runtime_error {
@@ -25,4 +28,6 @@ class TranslatorUtils {
 
     // 检查字符串是否为有效标识符
     static bool isValidIdentifier(const std::string& str);
+
+    static std::string pascalTypeToString(PascalType type);
 };

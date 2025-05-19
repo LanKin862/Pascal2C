@@ -126,3 +126,20 @@ bool TranslatorUtils::isValidIdentifier(const std::string& str) {
         return std::isalnum(c) || c == '_';
     });
 }
+
+/**
+ * 将PascalType枚举转换为可读的字符串
+ * @param type Pascal类型
+ * @return 类型的字符串表示c
+ */
+std::string TranslatorUtils::pascalTypeToString(PascalType type) {
+    switch (type) {
+        case PascalType::INTEGER: return "INTEGER";
+        case PascalType::REAL: return "REAL";
+        case PascalType::BOOLEAN: return "BOOLEAN";
+        case PascalType::CHAR: return "CHAR";
+        case PascalType::STRING: return "STRING";
+        case PascalType::ARRAY: return "ARRAY";
+        default: return "UNKNOWN";
+    }
+}

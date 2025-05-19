@@ -10,6 +10,7 @@
 #include "../antlr/PascalSVisitor.h"
 #include "SymbolTable.h"
 #include "TypeConverter.h"
+#include "TranslatorUtils.h"
 #include "antlr4-runtime.h"
 #include "support/Any.h"
 
@@ -32,7 +33,6 @@ class PascalToCTranslator : public PascalSVisitor {
     PascalType inferExpressionType(const std::string& expr);
     bool areTypesCompatible(PascalType leftType, PascalType rightType);
     bool areTypesForComparisonCompatible(PascalType leftType, PascalType rightType);
-    std::string pascalTypeToString(PascalType type);
     size_t findOperatorPosition(const std::string& expr, const std::string& op);
 
     template<typename T>

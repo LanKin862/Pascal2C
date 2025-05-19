@@ -8,6 +8,7 @@
 #include "../antlr/PascalSLexer.h"
 #include "../antlr/PascalSParser.h"
 #include "../include/TranslatorUtils.h"
+#include "../include/ErrorDealer.h"
 
 /**
  * Pascal到C翻译器的构造函数
@@ -549,9 +550,11 @@ antlrcpp::Any PascalToCTranslator::visitPeriod(PascalSParser::PeriodContext *con
         std::smatch tmpMatches;
         std::regex tmpPattern(R"(\.)");
         if (std::regex_search(numStrings[i].first, tmpMatches, tmpPattern) || std::regex_search(numStrings[i].second, tmpMatches, tmpPattern)) {
-            std::cout << "----------------------------------------------------------" << std::endl;
-            std::cout << "警告：数组索引不合法" << "，行：" << context->start->getLine() << std::endl;
-            std::cout << "----------------------------------------------------------" << std::endl;
+            auto *errorContext = new ErrorContext<PascalSParser::PeriodContext>();
+            errorContext->context = context;
+            errorContext->ss = &(output << getCurrentIndentation());
+            
+            InvalidArrayIndexStrategy(errorContext);
         }
         dimensions.push_back(bounds);
     }
@@ -601,7 +604,7 @@ antlrcpp::Any PascalToCTranslator::visitSubprogram(PascalSParser::SubprogramCont
         auto typeResult = visit(context->subprogramHead()->basicType());
         PascalType returnType = typeResult.as<PascalType>();
         std::string cType = typeConverter->convertType(returnType);
-        
+
         // 根据类型初始化返回值变量
         output << getCurrentIndentation() << cType << " " << funcNameTmp << " = ";
         if (returnType == PascalType::INTEGER) {
@@ -619,7 +622,7 @@ antlrcpp::Any PascalToCTranslator::visitSubprogram(PascalSParser::SubprogramCont
             output << "{0}";
         }
         output << ";\n";
-        
+
         // 同时将临时变量名存储在符号表中，以便正确引用
         SymbolEntry tmpEntry;
         tmpEntry.name = funcNameTmp;
@@ -1104,9 +1107,12 @@ antlrcpp::Any PascalToCTranslator::visitStatement(PascalSParser::StatementContex
     if (context->ID() && context->ASSIGNOP()) {
         std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
         if(!symbolTable->hasSymbol(id)){
-            std::cout << "----------------------------------------------------------" << std::endl;
-            std::cout << "警告：未定义的变量 " << id << " 在 " << symbolTable->getCurrentScope().getScopeName() << "，行：" << context->start->getLine() << std::endl;
-            std::cout << "----------------------------------------------------------" << std::endl;
+            auto *errorContext = new ErrorContext<PascalSParser::StatementContext>();
+            errorContext->context = context;
+            errorContext->symbolTable = symbolTable.get();
+            errorContext->id = id;
+            errorContext->ss = &(output << getCurrentIndentation());
+            UndefinedVariableStrategy(errorContext);
         }
 
         auto exprResult = visit(context->expression());
@@ -1119,17 +1125,20 @@ antlrcpp::Any PascalToCTranslator::visitStatement(PascalSParser::StatementContex
         if (symbolTable->hasSymbol(id)) {
             const SymbolEntry& leftEntry = symbolTable->getSymbol(id);
             PascalType leftType = leftEntry.dataType;
-            
+
             // 尝试获取表达式的类型
             PascalType rightType = inferExpressionType(expr);
-            
+
             // 检查类型是否匹配
             if (!areTypesCompatible(leftType, rightType)) {
-                std::cout << "----------------------------------------------------------" << std::endl;
-                std::cout << "警告：类型不匹配 - 将 " << pascalTypeToString(rightType) 
-                          << " 类型的值赋给 " << pascalTypeToString(leftType) 
-                          << " 类型的变量 " << id << "，行：" << context->start->getLine() << std::endl;
-                std::cout << "----------------------------------------------------------" << std::endl;
+                auto *errorContext = new ErrorContext<PascalSParser::StatementContext>();
+                errorContext->context = context;
+                errorContext->id = id;
+                errorContext->leftType = leftType;
+                errorContext->rightType = rightType;
+                errorContext->symbolTable = symbolTable.get();
+                errorContext->ss = &(output << getCurrentIndentation());
+                TypeMismatchInAssignmentStrategy(errorContext);
             }
         }
 
@@ -1154,26 +1163,28 @@ antlrcpp::Any PascalToCTranslator::visitStatement(PascalSParser::StatementContex
                     // 这是函数结果赋值（Pascal函数:=值）
                     auto exprResult = visit(context->expression());
                     std::string expr = exprResult.as<std::string>();
-                    
+
                     // 类型检查
                     if (symbolTable->hasSymbol(pair.second)) {
                         const SymbolEntry& leftEntry = symbolTable->getSymbol(pair.second);
                         PascalType leftType = leftEntry.dataType;
-                        
+
                         // 尝试获取表达式的类型
                         PascalType rightType = inferExpressionType(expr);
-                        
+
                         // 检查类型是否匹配
                         if (!areTypesCompatible(leftType, rightType)) {
-                            std::cout << "----------------------------------------------------------" << std::endl;
-                            std::cout << "警告：类型不匹配 - 将 " << pascalTypeToString(rightType) 
-                                      << " 类型的值赋给函数 " << pair.second << " 的 " 
-                                      << pascalTypeToString(leftType) << " 类型的返回值，行：" 
-                                      << context->start->getLine() << std::endl;
-                            std::cout << "----------------------------------------------------------" << std::endl;
+                            auto *errorContext = new ErrorContext<PascalSParser::StatementContext>;
+                            errorContext->context = context;
+                            errorContext->id = pair.second;
+                            errorContext->leftType = leftType;
+                            errorContext->rightType = rightType;
+                            errorContext->symbolTable = symbolTable.get();
+                            errorContext->ss = &(output << getCurrentIndentation());
+                            TypeMismatchInAssignmentStrategy(errorContext);
                         }
                     }
-                    
+
                     // 赋值给函数的tmp变量而不是直接返回
                     output << getCurrentIndentation() << pair.second << "tmp = " << expr << ";\n";
                     return antlrcpp::Any();
@@ -1201,24 +1212,27 @@ antlrcpp::Any PascalToCTranslator::visitStatement(PascalSParser::StatementContex
             if (symbolTable->hasSymbol(baseVar)) {
                 const SymbolEntry& leftEntry = symbolTable->getSymbol(baseVar);
                 PascalType leftType;
-                
+
                 // 如果是数组访问，使用数组元素类型
                 if (leftEntry.dataType == PascalType::ARRAY && bracketPos != std::string::npos) {
                     leftType = leftEntry.arrayElementType;
                 } else {
                     leftType = leftEntry.dataType;
                 }
-                
+
                 // 尝试获取表达式的类型
                 PascalType rightType = inferExpressionType(expr);
-                
+
                 // 检查类型是否匹配
                 if (!areTypesCompatible(leftType, rightType)) {
-                    std::cout << "----------------------------------------------------------" << std::endl;
-                    std::cout << "警告：类型不匹配 - 将 " << pascalTypeToString(rightType) 
-                              << " 类型的值赋给 " << pascalTypeToString(leftType) 
-                              << " 类型的变量 " << var << "，行：" << context->start->getLine() << std::endl;
-                    std::cout << "----------------------------------------------------------" << std::endl;
+                    auto *errorContext = new ErrorContext<PascalSParser::StatementContext>;
+                    errorContext->context = context;
+                    errorContext->id = var;
+                    errorContext->leftType = leftType;
+                    errorContext->rightType = rightType;
+                    errorContext->symbolTable = symbolTable.get();
+                    errorContext->ss = &(output << getCurrentIndentation());
+                    TypeMismatchInAssignmentStrategy(errorContext);
                 }
             }
 
@@ -1278,9 +1292,12 @@ antlrcpp::Any PascalToCTranslator::visitIfStatement(PascalSParser::IfStatementCo
     std::string cond = condResult.as<std::string>();
 
     if(inferExpressionType(cond) != PascalType::BOOLEAN) {
-        std::cout << "----------------------------------------------------------" << std::endl;
-        std::cout << "警告：条件语句条件表达式须是布尔类型 :" << cond  << "，行：" << context->start->getLine() << std::endl;
-        std::cout << "----------------------------------------------------------" << std::endl;
+        auto *errorContext = new ErrorContext<PascalSParser::IfStatementContext>;
+        errorContext->context = context;
+        errorContext->cond = cond;
+        errorContext->symbolTable = symbolTable.get();
+        errorContext->ss = &(output << getCurrentIndentation());
+        NonBooleanConditionStrategy(errorContext);
     }
 
     // 输出带有条件的if语句
@@ -1510,10 +1527,12 @@ antlrcpp::Any PascalToCTranslator::visitWriteStatement(PascalSParser::WriteState
                     }
                 }
             }else {
-                std::cout << "----------------------------------------------------------" << std::endl;
-                std::cout << "警告：未定义的变量 " << baseVar << " 在 " << symbolTable->getCurrentScope().getScopeName()
-                          << "，行：" << context->start->getLine() << std::endl;
-                std::cout << "----------------------------------------------------------" << std::endl;
+                auto *errorContext = new ErrorContext<PascalSParser::WriteStatementContext>;
+                errorContext->context = context;
+                errorContext->symbolTable = symbolTable.get();
+                errorContext->id = baseVar;
+                errorContext->ss = &(output << getCurrentIndentation());
+                UndefinedVariableStrategy(errorContext);
             }
         }
         if (!found) formatSpecifier = "%d";  // 默认使用整数格式
@@ -1611,10 +1630,12 @@ antlrcpp::Any PascalToCTranslator::visitVariable(PascalSParser::VariableContext 
         isArray = (entry.dataType == PascalType::ARRAY);
     }
     else {
-        std::cout << "----------------------------------------------------------" << std::endl;
-        std::cout << "警告：未定义的变量 " << id << " 在 " << symbolTable->getCurrentScope().getScopeName()
-                  << "，行：" << context->start->getLine() << std::endl;
-        std::cout << "----------------------------------------------------------" << std::endl;
+        auto *errorContext = new ErrorContext<PascalSParser::VariableContext>;
+        errorContext->context = context;
+        errorContext->symbolTable = symbolTable.get();
+        errorContext->id = id;
+        errorContext->ss = &(output << getCurrentIndentation());
+        UndefinedVariableStrategy(errorContext);
     }
 
     // 检查是否为数组访问
@@ -1677,15 +1698,23 @@ antlrcpp::Any PascalToCTranslator::visitProcedureCall(PascalSParser::ProcedureCa
     // 检查是否是带参数的过程调用
     if (context->expressionList()) {
         if (symbolTable->hasSymbol(id) && symbolTable->getSymbol(id).symbolType == SymbolType::FUNCTION) {
-            std::cout << "----------------------------------------------------------" << std::endl;
-            std::cout << "警告：该函数返回值被忽略 ：" << id << " 在 "
-                      << symbolTable->getCurrentScope().getScopeName() << "，行：" << context->start->getLine()
-                      << std::endl;
-            std::cout << "----------------------------------------------------------" << std::endl;
+            auto *errorContext = new ErrorContext<PascalSParser::ProcedureCallContext>;
+            errorContext->context = context;
+            errorContext->symbolTable = symbolTable.get();
+            errorContext->id = id;
+            errorContext->ss = &(output << getCurrentIndentation());
+            IgnoredFunctionReturnStrategy(errorContext);
         }
         return visitFunction_Procedure(context);
     }
-
+    if(!symbolTable->hasSymbol(id)) {
+        auto *errorContext = new ErrorContext<PascalSParser::ProcedureCallContext>;
+        errorContext->context = context;
+        errorContext->id = id;
+        errorContext->symbolTable = symbolTable.get();
+        errorContext->ss = &(output << getCurrentIndentation());
+        UndefinedFunctionStrategy(errorContext);
+    }
     // 无参数的过程调用
     return id + "()";
 }
@@ -1732,7 +1761,7 @@ antlrcpp::Any PascalToCTranslator::visitExpressionList(PascalSParser::Expression
     } catch (const std::bad_cast& e) {
         TranslatorUtils::logError("表达式列表中的类型转换错误：" + std::string(e.what()));
     }
-    
+
     return exprs;
 }
 
@@ -1765,22 +1794,24 @@ antlrcpp::Any PascalToCTranslator::visitExpression(PascalSParser::ExpressionCont
     if (right == currentScopeName) {
         right = right + "tmp";
     }
-    
+
     // 类型检查：比较操作数的类型是否兼容
     PascalType leftType = inferExpressionType(left);
     PascalType rightType = inferExpressionType(right);
-    
+
     // 检查比较操作数的类型是否兼容
     if (!areTypesForComparisonCompatible(leftType, rightType)) {
-        std::cout << "----------------------------------------------------------" << std::endl;
-        std::cout << "警告：比较操作类型不兼容 - 操作 " << pascalTypeToString(leftType)
-                  << " 类型与 " << pascalTypeToString(rightType) 
-                  << " 类型，行：" << context->start->getLine() << std::endl;
-        std::cout << "----------------------------------------------------------" << std::endl;
+        auto *errorContext = new ErrorContext<PascalSParser::ExpressionContext>;
+        errorContext->context = context;
+        errorContext->leftType = leftType;
+        errorContext->rightType = rightType;
+        errorContext->symbolTable = symbolTable.get();
+        errorContext->ss = &(output << getCurrentIndentation());
+        IncompatibleComparisonStrategy(errorContext);
     }
-    
+
     // 特殊情况：字符串比较需要使用strcmp
-    if ((leftType == PascalType::STRING || rightType == PascalType::STRING) && 
+    if ((leftType == PascalType::STRING || rightType == PascalType::STRING) &&
         (op == "==" || op == "!=" || op == "<" || op == "<=" || op == ">" || op == ">=")) {
         std::string comparisonExpr;
         if (op == "==") {
@@ -1896,10 +1927,12 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
     // 函数调用
     else if (context->ID() && context->expressionList()) {
         if(symbolTable->hasSymbol(context->ID()->getText()) && symbolTable->getSymbol(context->ID()->getText()).symbolType == SymbolType::PROCEDURE) {
-            std::cout << "----------------------------------------------------------" << std::endl;
-            std::cout << "警告：错误地将过程加入赋值操作 " << context->ID()->getText() << " 在行：" << context->start->getLine()
-                      << std::endl;
-            std::cout << "----------------------------------------------------------" << std::endl;
+            auto *errorContext = new ErrorContext<PascalSParser::FactorContext>;
+            errorContext->context = context;
+            errorContext->id = context->ID()->getText();
+            errorContext->symbolTable = symbolTable.get();
+            errorContext->ss = &(output << getCurrentIndentation());
+            ProcedureInAssignmentStrategy(errorContext);
         }
         return visitFunction_Procedure(context);
     }
@@ -1908,11 +1941,12 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
         std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
 
         if(!symbolTable->hasSymbol(id)){
-            std::cout << "----------------------------------------------------------" << std::endl;
-            std::cout << "警告：未定义的函数 " << id << " 在 "
-                      << symbolTable->getCurrentScope().getScopeName() << "，行：" << context->start->getLine()
-                      << std::endl;
-            std::cout << "----------------------------------------------------------" << std::endl;
+            auto *errorContext = new ErrorContext<PascalSParser::FactorContext>;
+            errorContext->context = context;
+            errorContext->symbolTable = symbolTable.get();
+            errorContext->id = id;
+            errorContext->ss = &(output << getCurrentIndentation());
+            UndefinedFunctionStrategy(errorContext);
         }
 
         // 检查此ID是否为符号表中的函数
@@ -1924,10 +1958,12 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
                 const ScopeEntry& scope = symbolTable->getScope(id);
                 // 检查函数是否没有参数
                 if (!scope.getParameters().empty()) {
-                    std::cout << "----------------------------------------------------------" << std::endl;
-                    std::cout << "警告：该函数参数有漏缺 " << id << " 在行：" << context->start->getLine()
-                              << std::endl;
-                    std::cout << "----------------------------------------------------------" << std::endl;
+                    auto *errorContext = new ErrorContext<PascalSParser::FactorContext>;
+                    errorContext->context = context;
+                    errorContext->id = id;
+                    errorContext->symbolTable = symbolTable.get();
+                    errorContext->ss = &(output << getCurrentIndentation());
+                    MissingArgumentsStrategy(errorContext);
                 }
                 return id + "()";
             } else if (entry.symbolType == SymbolType::PARAMETER) {
@@ -1936,7 +1972,7 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
                     return "(*" + id + ")";
                 }
             }
-            
+
             // 特殊情况：如果在函数中且引用了函数自身的名称
             // 作为变量（Pascal中的递归函数常见做法）
             if (id == symbolTable->getCurrentScope().getScopeName()) {
@@ -1944,7 +1980,7 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
                 return id + "tmp";
             }
         }
-        
+
         // 如果未识别为无参数函数，则视为普通变量
         return id;
     }
@@ -1953,11 +1989,12 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
         auto result = visit(context->factor());
         std::string factor = result.as<std::string>();
         if(!((factor[0]>='0' && factor[0]<='9') || factor[0]=='(' || factor[0]=='-' || factor[0]=='~' ||factor[0]=='+') && (!symbolTable->hasSymbol(factor))) {
-            std::cout << "----------------------------------------------------------" << std::endl;
-            std::cout << "警告：未定义的变量 " << factor << " 在 "
-                      << symbolTable->getCurrentScope().getScopeName() << "，行：" << context->start->getLine()
-                      << std::endl;
-            std::cout << "----------------------------------------------------------" << std::endl;
+            auto *errorContext = new ErrorContext<PascalSParser::FactorContext>;
+            errorContext->context = context;
+            errorContext->symbolTable = symbolTable.get();
+            errorContext->id = factor;
+            errorContext->ss = &(output << getCurrentIndentation());
+            UndefinedVariableStrategy(errorContext);
         }
         return antlrcpp::Any(std::string("~(") + factor + ")");
     }
@@ -1966,24 +2003,27 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
         auto result = visit(context->factor());
         std::string factor = result.as<std::string>();
         if(!((factor[0]>='0' && factor[0]<='9') || factor[0]=='(' || factor[0]=='-' || factor[0]=='~' ||factor[0]=='+') && (!symbolTable->hasSymbol(factor))) {
-            std::cout << "----------------------------------------------------------" << std::endl;
-            std::cout << "警告：未定义的变量 " << factor << " 在 "
-                      << symbolTable->getCurrentScope().getScopeName() << "，行：" << context->start->getLine()
-                      << std::endl;
-            std::cout << "----------------------------------------------------------" << std::endl;
+            auto *errorContext = new ErrorContext<PascalSParser::FactorContext>;
+            errorContext->context = context;
+            errorContext->symbolTable = symbolTable.get();
+            errorContext->id = factor;
+            errorContext->ss = &(output << getCurrentIndentation());
+            UndefinedVariableStrategy(errorContext);
         }
 
         return antlrcpp::Any(std::string("-(") + factor + ")");
     }
     // 一元加操作
     else if (context->PLUS()) {
-        auto result = visit(context->factor());        std::string factor = result.as<std::string>();
+        auto result = visit(context->factor());
+        std::string factor = result.as<std::string>();
         if(!((factor[0]>='0' && factor[0]<='9') || factor[0]=='(' || factor[0]=='-' || factor[0]=='~' ||factor[0]=='+') && (!symbolTable->hasSymbol(factor))) {
-            std::cout << "----------------------------------------------------------" << std::endl;
-            std::cout << "警告：未定义的变量 " << factor << " 在 "
-                      << symbolTable->getCurrentScope().getScopeName() << "，行：" << context->start->getLine()
-                      << std::endl;
-            std::cout << "----------------------------------------------------------" << std::endl;
+            auto *errorContext = new ErrorContext<PascalSParser::FactorContext>;
+            errorContext->context = context;
+            errorContext->symbolTable = symbolTable.get();
+            errorContext->id = factor;
+            errorContext->ss = &(output << getCurrentIndentation());
+            UndefinedVariableStrategy(errorContext);
         }
 
         return antlrcpp::Any(std::string("+(") + factor + ")");
@@ -2080,58 +2120,58 @@ PascalType PascalToCTranslator::inferExpressionType(const std::string& expr) {
     std::string trimmedExpr = expr;
     trimmedExpr.erase(0, trimmedExpr.find_first_not_of(" \t\n\r\f\v"));
     trimmedExpr.erase(trimmedExpr.find_last_not_of(" \t\n\r\f\v") + 1);
-    
+
     // 移除最外层括号（如果有）
     if (trimmedExpr.size() >= 2 && trimmedExpr[0] == '(' && trimmedExpr.back() == ')') {
         // 确保这是最外层的括号，而不是函数调用或其他结构
         bool isOutermostParen = true;
         int parenCount = 0;
-        
+
         for (size_t i = 0; i < trimmedExpr.size() - 1; ++i) {
             if (trimmedExpr[i] == '(') parenCount++;
             else if (trimmedExpr[i] == ')') parenCount--;
-            
+
             if (parenCount == 0 && i < trimmedExpr.size() - 1) {
                 isOutermostParen = false;
                 break;
             }
         }
-        
+
         if (isOutermostParen) {
             return inferExpressionType(trimmedExpr.substr(1, trimmedExpr.size() - 2));
         }
     }
-    
+
     // 检查是否为数字字面量
     if (std::regex_match(trimmedExpr, std::regex("^[+-]?\\d+$"))) {
         return PascalType::INTEGER;
     }
-    
+
     // 检查是否为浮点数字面量
     if (std::regex_match(trimmedExpr, std::regex("^[+-]?\\d+\\.\\d*$"))) {
         return PascalType::REAL;
     }
-    
+
     // 检查是否为布尔字面量
-    if (trimmedExpr == "true" || trimmedExpr == "false" || trimmedExpr == "1" || trimmedExpr == "0" || 
+    if (trimmedExpr == "true" || trimmedExpr == "false" || trimmedExpr == "1" || trimmedExpr == "0" ||
         trimmedExpr == "~(0)" || trimmedExpr == "~(1)" || trimmedExpr == "!(0)" || trimmedExpr == "!(1)") {
         return PascalType::BOOLEAN;
     }
-    
+
     // 检查是否为字符字面量
     if (trimmedExpr.size() >= 2 && trimmedExpr[0] == '\'' && trimmedExpr.back() == '\'' && trimmedExpr.size() == 3) {
         return PascalType::CHAR;
     }
-    
+
     // 检查是否为字符串字面量
-    if (trimmedExpr.size() >= 2 && 
-        ((trimmedExpr[0] == '\'' && trimmedExpr.back() == '\'' && trimmedExpr.size() > 3) || 
+    if (trimmedExpr.size() >= 2 &&
+        ((trimmedExpr[0] == '\'' && trimmedExpr.back() == '\'' && trimmedExpr.size() > 3) ||
          (trimmedExpr[0] == '\"' && trimmedExpr.back() == '\"'))) {
         return PascalType::STRING;
     }
-    
+
     // 处理复杂表达式
-    
+
     // 首先检查是否为关系表达式 (==, !=, <, <=, >, >=)
     std::vector<std::string> relOps = {"==", "!=", "<", "<=", ">", ">="};
     for (const auto& op : relOps) {
@@ -2141,7 +2181,7 @@ PascalType PascalToCTranslator::inferExpressionType(const std::string& expr) {
             return PascalType::BOOLEAN;
         }
     }
-    
+
     // 检查逻辑运算符 (&&, ||)
     std::vector<std::string> logicalOps = {"&&", "||"};
     for (const auto& op : logicalOps) {
@@ -2151,7 +2191,7 @@ PascalType PascalToCTranslator::inferExpressionType(const std::string& expr) {
             return PascalType::BOOLEAN;
         }
     }
-    
+
     // 检查加减运算符 (+, -)
     std::vector<std::string> addOps = {"+", "-"};
     for (const auto& op : addOps) {
@@ -2160,31 +2200,31 @@ PascalType PascalToCTranslator::inferExpressionType(const std::string& expr) {
             // 分割左右表达式
             std::string leftExpr = trimmedExpr.substr(0, pos);
             std::string rightExpr = trimmedExpr.substr(pos + op.length());
-            
+
             // 递归推断左右表达式的类型
             PascalType leftType = inferExpressionType(leftExpr);
             PascalType rightType = inferExpressionType(rightExpr);
-            
+
             // 如果任一操作数是REAL，结果是REAL
             if (leftType == PascalType::REAL || rightType == PascalType::REAL) {
                 return PascalType::REAL;
             }
-            
+
             // 如果两个操作数都是INTEGER，结果是INTEGER
             if (leftType == PascalType::INTEGER && rightType == PascalType::INTEGER) {
                 return PascalType::INTEGER;
             }
-            
+
             // 如果是字符串连接
             if (op == "+" && (leftType == PascalType::STRING || rightType == PascalType::STRING)) {
                 return PascalType::STRING;
             }
-            
+
             // 默认返回第一个操作数的类型
             return leftType;
         }
     }
-    
+
     // 检查乘除运算符 (*, /, %)
     std::vector<std::string> mulOps = {"*", "/", "%"};
     for (const auto& op : mulOps) {
@@ -2193,31 +2233,31 @@ PascalType PascalToCTranslator::inferExpressionType(const std::string& expr) {
             // 分割左右表达式
             std::string leftExpr = trimmedExpr.substr(0, pos);
             std::string rightExpr = trimmedExpr.substr(pos + op.length());
-            
+
             // 递归推断左右表达式的类型
             PascalType leftType = inferExpressionType(leftExpr);
             PascalType rightType = inferExpressionType(rightExpr);
-            
+
             // 除法总是返回REAL
             if (op == "/") {
                 return PascalType::REAL;
             }
-            
+
             // 如果任一操作数是REAL，结果是REAL
             if (leftType == PascalType::REAL || rightType == PascalType::REAL) {
                 return PascalType::REAL;
             }
-            
+
             // 如果两个操作数都是INTEGER，结果是INTEGER
             if (leftType == PascalType::INTEGER && rightType == PascalType::INTEGER) {
                 return PascalType::INTEGER;
             }
-            
+
             // 默认返回第一个操作数的类型
             return leftType;
         }
     }
-    
+
     // 检查一元运算符
     if (trimmedExpr.size() > 1) {
         if (trimmedExpr[0] == '-' || trimmedExpr[0] == '+') {
@@ -2229,7 +2269,7 @@ PascalType PascalToCTranslator::inferExpressionType(const std::string& expr) {
             return PascalType::BOOLEAN;
         }
     }
-    
+
     // 检查是否为函数调用
     size_t parenPos = trimmedExpr.find('(');
     if (parenPos != std::string::npos && trimmedExpr.back() == ')') {
@@ -2237,7 +2277,7 @@ PascalType PascalToCTranslator::inferExpressionType(const std::string& expr) {
         // 移除函数名中的空白
         funcName.erase(0, funcName.find_first_not_of(" \t\n\r\f\v"));
         funcName.erase(funcName.find_last_not_of(" \t\n\r\f\v") + 1);
-        
+
         // 在符号表中查找函数
         if (symbolTable->hasSymbol(funcName)) {
             const SymbolEntry& entry = symbolTable->getSymbol(funcName);
@@ -2246,20 +2286,20 @@ PascalType PascalToCTranslator::inferExpressionType(const std::string& expr) {
             }
         }
     }
-    
+
     // 检查是否为变量或数组访问
     std::string baseExpr = trimmedExpr;
     size_t bracketPos = trimmedExpr.find('[');
-    
+
     // 提取基本变量名
     if (bracketPos != std::string::npos) {
         baseExpr = trimmedExpr.substr(0, bracketPos);
     }
-    
+
     // 在符号表中查找变量
     if (symbolTable->hasSymbol(baseExpr)) {
         const SymbolEntry& entry = symbolTable->getSymbol(baseExpr);
-        
+
         if (entry.dataType == PascalType::ARRAY && bracketPos != std::string::npos) {
             // 数组访问，返回元素类型
             return entry.arrayElementType;
@@ -2268,7 +2308,7 @@ PascalType PascalToCTranslator::inferExpressionType(const std::string& expr) {
             return entry.dataType;
         }
     }
-    
+
     // 如果无法确定类型，默认为INTEGER
     return PascalType::INTEGER;
 }
@@ -2284,7 +2324,7 @@ size_t PascalToCTranslator::findOperatorPosition(const std::string& expr, const 
     int bracketCount = 0;
     bool inString = false;
     char stringDelimiter = 0;
-    
+
     // 从右向左搜索，以处理右结合性
     for (int i = expr.size() - 1; i >= 0; --i) {
         // 跳过字符串内容
@@ -2297,15 +2337,15 @@ size_t PascalToCTranslator::findOperatorPosition(const std::string& expr, const 
             }
             continue;
         }
-        
+
         if (inString) continue;
-        
+
         // 跟踪括号和方括号
         if (expr[i] == ')') parenCount++;
         else if (expr[i] == '(') parenCount--;
         else if (expr[i] == ']') bracketCount++;
         else if (expr[i] == '[') bracketCount--;
-        
+
         // 只在不在括号或方括号内时检查操作符
         if (parenCount == 0 && bracketCount == 0) {
             // 检查当前位置是否为操作符的开始
@@ -2323,7 +2363,7 @@ size_t PascalToCTranslator::findOperatorPosition(const std::string& expr, const 
             }
         }
     }
-    
+
     return std::string::npos;
 }
 
@@ -2338,50 +2378,33 @@ bool PascalToCTranslator::areTypesCompatible(PascalType leftType, PascalType rig
     if (leftType == rightType) {
         return true;
     }
-    
+
     // 类型兼容性规则
     switch (leftType) {
         case PascalType::REAL:
             // INTEGER 可以赋值给 REAL（隐式转换）
             return rightType == PascalType::INTEGER;
-            
+
         case PascalType::STRING:
             // CHAR 可以赋值给 STRING
             return rightType == PascalType::CHAR;
-            
+
         case PascalType::BOOLEAN:
             // 在某些情况下，INTEGER 可以视为布尔值（0为假，非0为真）
             // 但这通常不是Pascal的标准行为，所以默认不允许
             return false;
-            
+
         case PascalType::INTEGER:
             // 在某些Pascal方言中，CHAR可以转换为其ASCII值
             // 但这通常不是标准行为，所以默认不允许
             return false;
-            
+
         case PascalType::ARRAY:
             // 数组类型必须完全匹配（已在前面的相等检查中处理）
             return false;
-            
+
         default:
             return false;
-    }
-}
-
-/**
- * 将PascalType枚举转换为可读的字符串
- * @param type Pascal类型
- * @return 类型的字符串表示
- */
-std::string PascalToCTranslator::pascalTypeToString(PascalType type) {
-    switch (type) {
-        case PascalType::INTEGER: return "INTEGER";
-        case PascalType::REAL: return "REAL";
-        case PascalType::BOOLEAN: return "BOOLEAN";
-        case PascalType::CHAR: return "CHAR";
-        case PascalType::STRING: return "STRING";
-        case PascalType::ARRAY: return "ARRAY";
-        default: return "UNKNOWN";
     }
 }
 
@@ -2389,19 +2412,26 @@ std::string PascalToCTranslator::pascalTypeToString(PascalType type) {
 template<typename T>
 antlrcpp::Any PascalToCTranslator::visitFunction_Procedure(T *context) {
     std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
-
-    if(!symbolTable->hasSymbol(id)){
-        std::cout << "----------------------------------------------------------" << std::endl;
-        std::cout << "警告：未定义的函数/过程" << id << " 在行：" << context->start->getLine()
-                  << std::endl;
-        std::cout << "----------------------------------------------------------" << std::endl;
-    }
-
     auto result = visit(context->expressionList());
     std::vector<std::string> args = result.template as<std::vector<std::string>>();
 
     // 格式化函数调用
     std::stringstream ss;
+
+    if(!symbolTable->hasSymbol(id)){
+        auto *errorContext = new ErrorContext<T>;
+        errorContext->context = context;
+        errorContext->id = id;
+        errorContext->symbolTable = symbolTable.get();
+        errorContext->ss = &ss;
+        UndefinedFunctionStrategy(errorContext);
+        ss << getCurrentIndentation() << id << "(";
+        for (size_t i = 0; i < args.size() - 1; ++i)
+            ss << args[i] << ", ";
+        ss << args.back() << ")";
+
+        return ss.str();
+    }
     ss << id << "(";
 
     // 如果可用，获取函数定义以检查引用参数
@@ -2415,9 +2445,13 @@ antlrcpp::Any PascalToCTranslator::visitFunction_Procedure(T *context) {
             parameters = scope.getParameters();
 
             if(args.size() != parameters.size()) {
-                std::cout << "----------------------------------------------------------" << std::endl;
-                std::cout << "警告：函数调用时实参与形参的数量不匹配 :" << id << "，行：" << context->start->getLine() << std::endl;
-                std::cout << "----------------------------------------------------------" << std::endl;
+                auto *errorContext = new ErrorContext<T>;
+                errorContext->context = context;
+                errorContext->id = id;
+                errorContext->symbolTable = symbolTable.get();
+                errorContext->ss = &ss;
+                ArgumentCountMismatchStrategy(errorContext);
+                ss << getCurrentIndentation();
             }
 
             // 调试输出以验证参数
@@ -2430,10 +2464,11 @@ antlrcpp::Any PascalToCTranslator::visitFunction_Procedure(T *context) {
     }
 
     if(args.size() < parameters.size()) {
-        std::cout << "----------------------------------------------------------" << std::endl;
-        std::cout << "警告：该函数参数有漏缺 ：" << id << " 在行：" << context->start->getLine()
-                  << std::endl;
-        std::cout << "----------------------------------------------------------" << std::endl;
+        auto *errorContext = new ErrorContext<T>;
+        errorContext->context = context;
+        errorContext->id = id;
+        errorContext->symbolTable = symbolTable.get();
+        MissingArgumentsStrategy(errorContext);
     }
 
     for (size_t i = 0; i < args.size(); ++i) {
