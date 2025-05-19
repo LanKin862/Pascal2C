@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.20)
 
 option(BUILD_TESTING "Build tests" OFF)
 
@@ -58,11 +58,12 @@ else()
   endif()
 endif()
 
-if(${CMAKE_GENERATOR} MATCHES ".* Makefiles")
-  # This avoids
-  # 'warning: jobserver unavailable: using -j1. Add '+' to parent make rule.'
-  set(ANTLR4_BUILD_COMMAND mingw32-make)
-elseif(${CMAKE_GENERATOR} MATCHES "Visual Studio.*")
+#if(${CMAKE_GENERATOR} MATCHES ".* Makefiles")
+#  # This avoids
+#  # 'warning: jobserver unavailable: using -j1. Add '+' to parent make rule.'
+#  set(ANTLR4_BUILD_COMMAND mingw32-make)
+#else
+if(${CMAKE_GENERATOR} MATCHES "Visual Studio.*")
   set(ANTLR4_BUILD_COMMAND
           ${CMAKE_COMMAND}
           --build .
