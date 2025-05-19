@@ -72,7 +72,7 @@ static void InvalidArrayIndexStrategy(ErrorContext<T> *errorContext) {
     std::cout << "数组索引不合法"
               << "，行：" << errorContext->context->start->getLine() << std::endl;
     std::cout << "----------------------------------------------------------" << std::endl;
-    *(errorContext->ss) << "//[Warning] 数组索引不合法" << std::endl;
+    *(errorContext->ss) << "//[Warning] 原Pascal数组索引不合法" << std::endl;
 }
 
 
