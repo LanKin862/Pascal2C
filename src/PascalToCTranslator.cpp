@@ -553,7 +553,7 @@ antlrcpp::Any PascalToCTranslator::visitPeriod(PascalSParser::PeriodContext *con
             auto *errorContext = new ErrorContext<PascalSParser::PeriodContext>();
             errorContext->context = context;
             errorContext->ss = &(output << getCurrentIndentation());
-            
+
             InvalidArrayIndexStrategy(errorContext);
         }
         dimensions.push_back(bounds);
@@ -1695,16 +1695,16 @@ antlrcpp::Any PascalToCTranslator::visitIdVarPart(PascalSParser::IdVarPartContex
  */
 antlrcpp::Any PascalToCTranslator::visitProcedureCall(PascalSParser::ProcedureCallContext *context) {
     std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
+    if (symbolTable->hasSymbol(id) && symbolTable->getSymbol(id).symbolType == SymbolType::FUNCTION) {
+        auto *errorContext = new ErrorContext<PascalSParser::ProcedureCallContext>;
+        errorContext->context = context;
+        errorContext->symbolTable = symbolTable.get();
+        errorContext->id = id;
+        errorContext->ss = &(output << getCurrentIndentation());
+        IgnoredFunctionReturnStrategy(errorContext);
+    }
     // 检查是否是带参数的过程调用
     if (context->expressionList()) {
-        if (symbolTable->hasSymbol(id) && symbolTable->getSymbol(id).symbolType == SymbolType::FUNCTION) {
-            auto *errorContext = new ErrorContext<PascalSParser::ProcedureCallContext>;
-            errorContext->context = context;
-            errorContext->symbolTable = symbolTable.get();
-            errorContext->id = id;
-            errorContext->ss = &(output << getCurrentIndentation());
-            IgnoredFunctionReturnStrategy(errorContext);
-        }
         return visitFunction_Procedure(context);
     }
     if(!symbolTable->hasSymbol(id)) {
@@ -2449,9 +2449,8 @@ antlrcpp::Any PascalToCTranslator::visitFunction_Procedure(T *context) {
                 errorContext->context = context;
                 errorContext->id = id;
                 errorContext->symbolTable = symbolTable.get();
-                errorContext->ss = &ss;
+                errorContext->ss = &(output << getCurrentIndentation());
                 ArgumentCountMismatchStrategy(errorContext);
-                ss << getCurrentIndentation();
             }
 
             // 调试输出以验证参数
@@ -2468,10 +2467,11 @@ antlrcpp::Any PascalToCTranslator::visitFunction_Procedure(T *context) {
         errorContext->context = context;
         errorContext->id = id;
         errorContext->symbolTable = symbolTable.get();
+        errorContext->ss = &(output << getCurrentIndentation());
         MissingArgumentsStrategy(errorContext);
     }
 
-    for (size_t i = 0; i < args.size(); ++i) {
+    for (int i = 0; i < args.size(); ++i) {
         if (i > 0) {
             ss << ", ";
         }
@@ -2484,7 +2484,7 @@ antlrcpp::Any PascalToCTranslator::visitFunction_Procedure(T *context) {
         // 修复参数排序问题：作用域参数列表中的参数
         // 与它们在Pascal源代码中的出现顺序相反。
         // 需要反转索引以匹配正确的参数。
-        if (i <= parameters.size() - 1) {
+        if (i + 1 <= parameters.size()) {
             // 计算正确的参数索引（参数按相反顺序）
             size_t paramIndex = parameters.size() - 1 - i;
 
