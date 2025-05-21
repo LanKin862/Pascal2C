@@ -1648,7 +1648,7 @@ antlrcpp::Any PascalToCTranslator::visitVariable(PascalSParser::VariableContext 
         auto end = std::sregex_token_iterator();
         int i = 0, flag = 0;
         for (auto it = begin; it != end; ++it, ++i) {
-            if(std::stoi(*it) > (symbolTable->getSymbol(id).arrayDimensions[i].upperBound - symbolTable->getSymbol(id).arrayDimensions[i].lowerBound - 1)) flag = 1;
+            if(std::stoi(*it) > (symbolTable->getSymbol(id).arrayDimensions[i].upperBound - symbolTable->getSymbol(id).arrayDimensions[i].lowerBound - 1) || std::stoi(*it) < 0) flag = 1;
         }
         if(flag) {
             auto *errorContext = new ErrorContext<PascalSParser::VariableContext>;

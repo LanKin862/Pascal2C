@@ -274,7 +274,7 @@ static void ArrayIndexOutOfBoundsStrategy(ErrorContext<T> *errorContext) {
 
     std::cout << "-" << std::endl;
     std::cout << "警告：";
-    std::cout << "数组索引越界";
+    std::cout << "数组索引不合法";
 
     if (errorContext->symbolTable != nullptr) {
         std::cout << " 在 " << errorContext->symbolTable->getCurrentScope().getScopeName();
@@ -286,7 +286,7 @@ static void ArrayIndexOutOfBoundsStrategy(ErrorContext<T> *errorContext) {
 
     std::cout << std::endl;
     std::cout << "-" << std::endl;
-    *(errorContext->ss) << "//[Warning] 数组索引越界" << std::endl;
+    *(errorContext->ss) << "//[Warning] 数组索引不合法" << std::endl;
 
     deleteErrorContext(errorContext);
 }
