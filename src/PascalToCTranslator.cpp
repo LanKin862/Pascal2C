@@ -549,12 +549,12 @@ antlrcpp::Any PascalToCTranslator::visitPeriod(PascalSParser::PeriodContext *con
         bounds.upperBound = std::stoi(numStrings[i].second);
         std::smatch tmpMatches;
         std::regex tmpPattern(R"(\.)");
-        if (std::regex_search(numStrings[i].first, tmpMatches, tmpPattern) || std::regex_search(numStrings[i].second, tmpMatches, tmpPattern)) {
+        if (std::regex_search(numStrings[i].first, tmpMatches, tmpPattern) || std::regex_search(numStrings[i].second, tmpMatches, tmpPattern) || bounds.lowerBound > bounds.upperBound) {
             auto *errorContext = new ErrorContext<PascalSParser::PeriodContext>();
             errorContext->context = context;
             errorContext->ss = &(output << getCurrentIndentation());
 
-            InvalidArrayIndexStrategy(errorContext);
+            InvalidArrayIndex(errorContext);
         }
         dimensions.push_back(bounds);
     }
@@ -1112,7 +1112,7 @@ antlrcpp::Any PascalToCTranslator::visitStatement(PascalSParser::StatementContex
             errorContext->symbolTable = symbolTable.get();
             errorContext->id = id;
             errorContext->ss = &(output << getCurrentIndentation());
-            UndefinedVariableStrategy(errorContext);
+            UndefinedVariable(errorContext);
         }
 
         auto exprResult = visit(context->expression());
@@ -1138,7 +1138,7 @@ antlrcpp::Any PascalToCTranslator::visitStatement(PascalSParser::StatementContex
                 errorContext->rightType = rightType;
                 errorContext->symbolTable = symbolTable.get();
                 errorContext->ss = &(output << getCurrentIndentation());
-                TypeMismatchInAssignmentStrategy(errorContext);
+                TypeMismatchInAssignment(errorContext);
             }
         }
 
@@ -1181,7 +1181,7 @@ antlrcpp::Any PascalToCTranslator::visitStatement(PascalSParser::StatementContex
                             errorContext->rightType = rightType;
                             errorContext->symbolTable = symbolTable.get();
                             errorContext->ss = &(output << getCurrentIndentation());
-                            TypeMismatchInAssignmentStrategy(errorContext);
+                            TypeMismatchInAssignment(errorContext);
                         }
                     }
 
@@ -1232,7 +1232,7 @@ antlrcpp::Any PascalToCTranslator::visitStatement(PascalSParser::StatementContex
                     errorContext->rightType = rightType;
                     errorContext->symbolTable = symbolTable.get();
                     errorContext->ss = &(output << getCurrentIndentation());
-                    TypeMismatchInAssignmentStrategy(errorContext);
+                    TypeMismatchInAssignment(errorContext);
                 }
             }
 
@@ -1297,7 +1297,7 @@ antlrcpp::Any PascalToCTranslator::visitIfStatement(PascalSParser::IfStatementCo
         errorContext->cond = cond;
         errorContext->symbolTable = symbolTable.get();
         errorContext->ss = &(output << getCurrentIndentation());
-        NonBooleanConditionStrategy(errorContext);
+        NonBooleanCondition(errorContext);
     }
 
     // 输出带有条件的if语句
@@ -1532,7 +1532,7 @@ antlrcpp::Any PascalToCTranslator::visitWriteStatement(PascalSParser::WriteState
                 errorContext->symbolTable = symbolTable.get();
                 errorContext->id = baseVar;
                 errorContext->ss = &(output << getCurrentIndentation());
-                UndefinedVariableStrategy(errorContext);
+                UndefinedVariable(errorContext);
             }
         }
         if (!found) formatSpecifier = "%d";  // 默认使用整数格式
@@ -1635,7 +1635,7 @@ antlrcpp::Any PascalToCTranslator::visitVariable(PascalSParser::VariableContext 
         errorContext->symbolTable = symbolTable.get();
         errorContext->id = id;
         errorContext->ss = &(output << getCurrentIndentation());
-        UndefinedVariableStrategy(errorContext);
+        UndefinedVariable(errorContext);
     }
 
     // 检查是否为数组访问
@@ -1656,7 +1656,7 @@ antlrcpp::Any PascalToCTranslator::visitVariable(PascalSParser::VariableContext 
             errorContext->symbolTable = symbolTable.get();
             errorContext->id = id;
             errorContext->ss = &(output << getCurrentIndentation());
-            ArrayIndexOutOfBoundsStrategy(errorContext);
+            ArrayIndexOutOfBounds(errorContext);
         }
 
         // 仅在它们被传递到的函数内部使用时，才解引用引用参数（非局部变量）
@@ -1716,7 +1716,7 @@ antlrcpp::Any PascalToCTranslator::visitProcedureCall(PascalSParser::ProcedureCa
         errorContext->symbolTable = symbolTable.get();
         errorContext->id = id;
         errorContext->ss = &(output << getCurrentIndentation());
-        IgnoredFunctionReturnStrategy(errorContext);
+        IgnoredFunctionReturn(errorContext);
     }
     // 检查是否是带参数的过程调用
     if (context->expressionList()) {
@@ -1728,7 +1728,7 @@ antlrcpp::Any PascalToCTranslator::visitProcedureCall(PascalSParser::ProcedureCa
         errorContext->id = id;
         errorContext->symbolTable = symbolTable.get();
         errorContext->ss = &(output << getCurrentIndentation());
-        UndefinedFunctionStrategy(errorContext);
+        UndefinedFunction(errorContext);
     }
     // 无参数的过程调用
     return id + "()";
@@ -1822,7 +1822,7 @@ antlrcpp::Any PascalToCTranslator::visitExpression(PascalSParser::ExpressionCont
         errorContext->rightType = rightType;
         errorContext->symbolTable = symbolTable.get();
         errorContext->ss = &(output << getCurrentIndentation());
-        IncompatibleComparisonStrategy(errorContext);
+        IncompatibleComparison(errorContext);
     }
 
     // 特殊情况：字符串比较需要使用strcmp
@@ -1948,7 +1948,7 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
             errorContext->id = context->ID()->getText();
             errorContext->symbolTable = symbolTable.get();
             errorContext->ss = &(output << getCurrentIndentation());
-            ProcedureInAssignmentStrategy(errorContext);
+            ProcedureInAssignment(errorContext);
         }
         if(context->expressionList()) {
             return visitFunction_Procedure(context);
@@ -1961,7 +1961,7 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
                 errorContext->symbolTable = symbolTable.get();
                 errorContext->id = id;
                 errorContext->ss = &(output << getCurrentIndentation());
-                UndefinedFunctionStrategy(errorContext);
+                UndefinedFunction(errorContext);
             }
 
             // 检查此ID是否为符号表中的函数
@@ -1978,7 +1978,7 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
                         errorContext->id = id;
                         errorContext->symbolTable = symbolTable.get();
                         errorContext->ss = &(output << getCurrentIndentation());
-                        MissingArgumentsStrategy(errorContext);
+                        MissingArguments(errorContext);
                     }
                     return id + "()";
                 } else if (entry.symbolType == SymbolType::PARAMETER) {
@@ -2010,7 +2010,7 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
             errorContext->symbolTable = symbolTable.get();
             errorContext->id = factor;
             errorContext->ss = &(output << getCurrentIndentation());
-            UndefinedVariableStrategy(errorContext);
+            UndefinedVariable(errorContext);
         }
         return antlrcpp::Any(std::string("~(") + factor + ")");
     }
@@ -2024,7 +2024,7 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
             errorContext->symbolTable = symbolTable.get();
             errorContext->id = factor;
             errorContext->ss = &(output << getCurrentIndentation());
-            UndefinedVariableStrategy(errorContext);
+            UndefinedVariable(errorContext);
         }
 
         return antlrcpp::Any(std::string("-(") + factor + ")");
@@ -2039,7 +2039,7 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
             errorContext->symbolTable = symbolTable.get();
             errorContext->id = factor;
             errorContext->ss = &(output << getCurrentIndentation());
-            UndefinedVariableStrategy(errorContext);
+            UndefinedVariable(errorContext);
         }
 
         return antlrcpp::Any(std::string("+(") + factor + ")");
@@ -2440,7 +2440,7 @@ antlrcpp::Any PascalToCTranslator::visitFunction_Procedure(T *context) {
         errorContext->id = id;
         errorContext->symbolTable = symbolTable.get();
         errorContext->ss = &ss;
-        UndefinedFunctionStrategy(errorContext);
+        UndefinedFunction(errorContext);
         ss << getCurrentIndentation() << id << "(";
         for (size_t i = 0; i < args.size() - 1; ++i)
             ss << args[i] << ", ";
@@ -2460,15 +2460,6 @@ antlrcpp::Any PascalToCTranslator::visitFunction_Procedure(T *context) {
             const ScopeEntry& scope = symbolTable->getScope(id);
             parameters = scope.getParameters();
 
-            if(args.size() != parameters.size()) {
-                auto *errorContext = new ErrorContext<T>;
-                errorContext->context = context;
-                errorContext->id = id;
-                errorContext->symbolTable = symbolTable.get();
-                errorContext->ss = &(output << getCurrentIndentation());
-                ArgumentCountMismatchStrategy(errorContext);
-            }
-
             // 调试输出以验证参数
             TranslatorUtils::logDebug("函数 " + id + " 参数：");
             for (size_t i = 0; i < parameters.size(); ++i) {
@@ -2478,13 +2469,16 @@ antlrcpp::Any PascalToCTranslator::visitFunction_Procedure(T *context) {
         }
     }
 
-    if(args.size() < parameters.size()) {
+    if(args.size() != parameters.size()) {
         auto *errorContext = new ErrorContext<T>;
         errorContext->context = context;
         errorContext->id = id;
         errorContext->symbolTable = symbolTable.get();
         errorContext->ss = &(output << getCurrentIndentation());
-        MissingArgumentsStrategy(errorContext);
+        if(args.size() > parameters.size())
+            ArgumentCountMismatch(errorContext);
+        else
+            MissingArguments(errorContext);
     }
 
     for (int i = 0; i < args.size(); ++i) {

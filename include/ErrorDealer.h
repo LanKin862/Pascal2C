@@ -40,7 +40,7 @@ void deleteErrorContext(ErrorContext<T>* errorContext) {
 }
 
 template<typename T>
-void UndefinedFunctionStrategy(ErrorContext<T> *errorContext) {
+void UndefinedFunction(ErrorContext<T> *errorContext) {
     if (errorContext == nullptr || errorContext->ss == nullptr) return;
     
     std::cout << "----------------------------------------------------------" << std::endl;
@@ -63,12 +63,12 @@ void UndefinedFunctionStrategy(ErrorContext<T> *errorContext) {
 }
 
 template<typename T>
-static void ArgumentCountMismatchStrategy(ErrorContext<T> *errorContext) {
+static void ArgumentCountMismatch(ErrorContext<T> *errorContext) {
     if (errorContext == nullptr || errorContext->ss == nullptr) return;
     
     std::cout << "----------------------------------------------------------" << std::endl;
     std::cout << "警告：";
-    std::cout << "函数调用时实参与形参数量不匹配：" << errorContext->id;
+    std::cout << "函数调用时实参数量多余与形参数量：" << errorContext->id;
     
     if (errorContext->symbolTable != nullptr) {
         std::cout << " 在 " << errorContext->symbolTable->getCurrentScope().getScopeName();
@@ -80,13 +80,13 @@ static void ArgumentCountMismatchStrategy(ErrorContext<T> *errorContext) {
     
     std::cout << std::endl;
     std::cout << "----------------------------------------------------------" << std::endl;
-    *(errorContext->ss) << "//[Warning] 函数调用时实参与形参数量不匹配 ：" << errorContext->id << std::endl;
+    *(errorContext->ss) << "//[Warning] 函数调用时实参数量多余与形参数量 ：" << errorContext->id << std::endl;
     
     deleteErrorContext(errorContext);
 }
 
 template<typename T>
-static void MissingArgumentsStrategy(ErrorContext<T> *errorContext) {
+static void MissingArguments(ErrorContext<T> *errorContext) {
     if (errorContext == nullptr || errorContext->ss == nullptr) return;
     
     std::cout << "----------------------------------------------------------" << std::endl;
@@ -109,12 +109,12 @@ static void MissingArgumentsStrategy(ErrorContext<T> *errorContext) {
 }
 
 template<typename T>
-static void InvalidArrayIndexStrategy(ErrorContext<T> *errorContext) {
+static void InvalidArrayIndex(ErrorContext<T> *errorContext) {
     if (errorContext == nullptr || errorContext->ss == nullptr) return;
     
     std::cout << "----------------------------------------------------------" << std::endl;
     std::cout << "警告：";
-    std::cout << "数组索引不合法";
+    std::cout << "数组索引定义不合法";
     
     if (errorContext->context != nullptr && errorContext->context->start != nullptr) {
         std::cout << "，行：" << errorContext->context->start->getLine();
@@ -122,13 +122,13 @@ static void InvalidArrayIndexStrategy(ErrorContext<T> *errorContext) {
     
     std::cout << std::endl;
     std::cout << "----------------------------------------------------------" << std::endl;
-    *(errorContext->ss) << "//[Warning] 原Pascal数组索引不合法" << std::endl;
+    *(errorContext->ss) << "//[Warning] 原Pascal数组索引定义不合法" << std::endl;
     
     deleteErrorContext(errorContext);
 }
 
 template<typename T>
-static void UndefinedVariableStrategy(ErrorContext<T> *errorContext) {
+static void UndefinedVariable(ErrorContext<T> *errorContext) {
     if (errorContext == nullptr || errorContext->ss == nullptr) return;
     
     std::cout << "----------------------------------------------------------" << std::endl;
@@ -151,7 +151,7 @@ static void UndefinedVariableStrategy(ErrorContext<T> *errorContext) {
 }
 
 template<typename T>
-static void TypeMismatchInAssignmentStrategy(ErrorContext<T> *errorContext) {
+static void TypeMismatchInAssignment(ErrorContext<T> *errorContext) {
     if (errorContext == nullptr || errorContext->ss == nullptr) return;
     
     std::cout << "----------------------------------------------------------" << std::endl;
@@ -176,7 +176,7 @@ static void TypeMismatchInAssignmentStrategy(ErrorContext<T> *errorContext) {
 }
 
 template<typename T>
-static void NonBooleanConditionStrategy(ErrorContext<T> *errorContext) {
+static void NonBooleanCondition(ErrorContext<T> *errorContext) {
     if (errorContext == nullptr || errorContext->ss == nullptr) return;
     
     std::cout << "----------------------------------------------------------" << std::endl;
@@ -199,7 +199,7 @@ static void NonBooleanConditionStrategy(ErrorContext<T> *errorContext) {
 }
 
 template<typename T>
-static void IgnoredFunctionReturnStrategy(ErrorContext<T> *errorContext) {
+static void IgnoredFunctionReturn(ErrorContext<T> *errorContext) {
     if (errorContext == nullptr || errorContext->ss == nullptr) return;
     
     std::cout << "----------------------------------------------------------" << std::endl;
@@ -222,7 +222,7 @@ static void IgnoredFunctionReturnStrategy(ErrorContext<T> *errorContext) {
 }
 
 template<typename T>
-static void IncompatibleComparisonStrategy(ErrorContext<T> *errorContext) {
+static void IncompatibleComparison(ErrorContext<T> *errorContext) {
     if (errorContext == nullptr || errorContext->ss == nullptr) return;
     
     std::cout << "----------------------------------------------------------" << std::endl;
@@ -246,7 +246,7 @@ static void IncompatibleComparisonStrategy(ErrorContext<T> *errorContext) {
 }
 
 template<typename T>
-static void ProcedureInAssignmentStrategy(ErrorContext<T> *errorContext) {
+static void ProcedureInAssignment(ErrorContext<T> *errorContext) {
     if (errorContext == nullptr || errorContext->ss == nullptr) return;
     
     std::cout << "----------------------------------------------------------" << std::endl;
@@ -269,12 +269,12 @@ static void ProcedureInAssignmentStrategy(ErrorContext<T> *errorContext) {
 }
 
 template<typename T>
-static void ArrayIndexOutOfBoundsStrategy(ErrorContext<T> *errorContext) {
+static void ArrayIndexOutOfBounds(ErrorContext<T> *errorContext) {
     if (errorContext == nullptr || errorContext->ss == nullptr) return;
 
     std::cout << "-" << std::endl;
     std::cout << "警告：";
-    std::cout << "数组索引不合法";
+    std::cout << "数组索引使用不合法";
 
     if (errorContext->symbolTable != nullptr) {
         std::cout << " 在 " << errorContext->symbolTable->getCurrentScope().getScopeName();
@@ -286,7 +286,7 @@ static void ArrayIndexOutOfBoundsStrategy(ErrorContext<T> *errorContext) {
 
     std::cout << std::endl;
     std::cout << "-" << std::endl;
-    *(errorContext->ss) << "//[Warning] 数组索引不合法" << std::endl;
+    *(errorContext->ss) << "//[Warning] 数组索引使用不合法" << std::endl;
 
     deleteErrorContext(errorContext);
 }
