@@ -97,6 +97,120 @@ std::string translate(const std::string &inputFile);  // 转换Pascal文件为C�
 4. 管理作用域层级以正确处理嵌套结构
 5. 生成类型匹配的C代码并处理特殊情况
 
+```mermaid
+graph TD
+
+program --> programStruct
+programStruct --> programHead
+programStruct --> programBody
+
+programHead --> ID
+programHead --> idList
+
+idList --> ID
+
+programBody --> constDeclarations
+programBody --> varDeclarations
+programBody --> subprogramDeclarations
+programBody --> compoundStatement
+
+constDeclarations --> constDeclaration
+constDeclaration --> constValue
+constValue --> num
+constValue --> LETTER
+constValue --> STRING
+
+varDeclarations --> varDeclaration
+varDeclaration --> idList
+varDeclaration --> type
+type --> basicType
+type --> period
+type --> ARRAY
+period --> NUM
+
+subprogramDeclarations --> subprogram
+subprogram --> subprogramHead
+subprogram --> subprogramBody
+subprogramHead --> formalParameter
+formalParameter --> parameterList
+parameterList --> parameter
+parameter --> varParameter
+parameter --> valueParameter
+varParameter --> valueParameter
+valueParameter --> idList
+valueParameter --> type
+
+subprogramBody --> constDeclarations
+subprogramBody --> varDeclarations
+subprogramBody --> compoundStatement
+
+compoundStatement --> statementList
+statementList --> statement
+statement --> variable
+statement --> procedureCall
+statement --> compoundStatement
+statement --> ifStatement
+statement --> forStatement
+statement --> whileStatement
+statement --> readStatement
+statement --> writeStatement
+statement --> breakStatement
+statement --> expression
+
+ifStatement --> expression
+ifStatement --> statement
+ifStatement --> elsePart
+
+elsePart --> statement
+
+forStatement --> expression
+forStatement --> statement
+
+whileStatement --> expression
+whileStatement --> statement
+
+readStatement --> variableList
+variableList --> variable
+
+writeStatement --> expressionList
+expressionList --> expression
+
+expression --> simpleExpression
+expression --> relop
+expression --> simpleExpression
+
+simpleExpression --> term
+simpleExpression --> addop
+simpleExpression --> term
+
+term --> factor
+term --> mulop
+term --> factor
+
+factor --> num
+factor --> variable
+factor --> expression
+factor --> ID
+factor --> expressionList
+factor --> NOT
+factor --> MINUS
+factor --> PLUS
+factor --> STRING
+factor --> LETTER
+
+variable --> ID
+variable --> idVarPart
+idVarPart --> expressionList
+
+procedureCall --> ID
+procedureCall --> expressionList
+
+```
+
+
+
+
+
 ### 1.2 SymbolTable 类 (符号管理)
 
 **文件**: `include/SymbolTable.h`, `src/SymbolTable.cpp`

@@ -16,7 +16,8 @@ enum class ErrorType {
     NON_BOOLEAN_CONDITION,
     IGNORED_FUNCTION_RETURN,
     INCOMPATIBLE_COMPARISON,
-    PROCEDURE_IN_ASSIGNMENT
+    PROCEDURE_IN_ASSIGNMENT,
+    ARRAY_INDEX_OUT_OF_BOUNDS
 };
 
 template<typename T>
@@ -30,7 +31,7 @@ struct ErrorContext {
     std::ostream *ss = nullptr;
 };
 
-// Helper function to safely delete ErrorContext after use
+// Helper函数用于在使用后安全地删除ErrorContext
 template<typename T>
 void deleteErrorContext(ErrorContext<T>* errorContext) {
     if (errorContext != nullptr) {
@@ -267,3 +268,25 @@ static void ProcedureInAssignmentStrategy(ErrorContext<T> *errorContext) {
     deleteErrorContext(errorContext);
 }
 
+template<typename T>
+static void ArrayIndexOutOfBoundsStrategy(ErrorContext<T> *errorContext) {
+    if (errorContext == nullptr || errorContext->ss == nullptr) return;
+
+    std::cout << "-" << std::endl;
+    std::cout << "警告：";
+    std::cout << "数组索引越界";
+
+    if (errorContext->symbolTable != nullptr) {
+        std::cout << " 在 " << errorContext->symbolTable->getCurrentScope().getScopeName();
+    }
+
+    if (errorContext->context != nullptr && errorContext->context->start != nullptr) {
+        std::cout << " ，行：" << errorContext->context->start->getLine();
+    }
+
+    std::cout << std::endl;
+    std::cout << "-" << std::endl;
+    *(errorContext->ss) << "//[Warning] 数组索引越界" << std::endl;
+
+    deleteErrorContext(errorContext);
+}

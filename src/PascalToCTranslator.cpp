@@ -1643,6 +1643,21 @@ antlrcpp::Any PascalToCTranslator::visitVariable(PascalSParser::VariableContext 
     if (context->idVarPart()) {
         auto partResult = visit(context->idVarPart());
         std::string indices = partResult.as<std::string>();
+        std::regex regex("\\d+");
+        auto begin = std::sregex_token_iterator(indices.begin(), indices.end(), regex);
+        auto end = std::sregex_token_iterator();
+        int i = 0, flag = 0;
+        for (auto it = begin; it != end; ++it, ++i) {
+            if(std::stoi(*it) > (symbolTable->getSymbol(id).arrayDimensions[i].upperBound - symbolTable->getSymbol(id).arrayDimensions[i].lowerBound - 1)) flag = 1;
+        }
+        if(flag) {
+            auto *errorContext = new ErrorContext<PascalSParser::VariableContext>;
+            errorContext->context = context;
+            errorContext->symbolTable = symbolTable.get();
+            errorContext->id = id;
+            errorContext->ss = &(output << getCurrentIndentation());
+            ArrayIndexOutOfBoundsStrategy(errorContext);
+        }
 
         // 仅在它们被传递到的函数内部使用时，才解引用引用参数（非局部变量）
         if (isReferenceParam && !isArray && symbolTable->hasSymbolInCurrentScope(id)) {
@@ -1925,8 +1940,9 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
         return antlrcpp::Any(std::string("(") + expr + ")");
     }
     // 函数调用
-    else if (context->ID() && context->expressionList()) {
-        if(symbolTable->hasSymbol(context->ID()->getText()) && symbolTable->getSymbol(context->ID()->getText()).symbolType == SymbolType::PROCEDURE) {
+    else if (context->ID()) {
+        std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
+        if(symbolTable->hasSymbol(id) && symbolTable->getSymbol(id).symbolType == SymbolType::PROCEDURE) {
             auto *errorContext = new ErrorContext<PascalSParser::FactorContext>;
             errorContext->context = context;
             errorContext->id = context->ID()->getText();
@@ -1934,55 +1950,55 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
             errorContext->ss = &(output << getCurrentIndentation());
             ProcedureInAssignmentStrategy(errorContext);
         }
-        return visitFunction_Procedure(context);
-    }
-    // 无括号的函数调用（用于没有参数的Pascal函数）
-    else if (context->ID() && !context->expressionList()) {
-        std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
-
-        if(!symbolTable->hasSymbol(id)){
-            auto *errorContext = new ErrorContext<PascalSParser::FactorContext>;
-            errorContext->context = context;
-            errorContext->symbolTable = symbolTable.get();
-            errorContext->id = id;
-            errorContext->ss = &(output << getCurrentIndentation());
-            UndefinedFunctionStrategy(errorContext);
+        if(context->expressionList()) {
+            return visitFunction_Procedure(context);
         }
+        // 无括号的函数调用（用于没有参数的Pascal函数）
+        else {
+            if(!symbolTable->hasSymbol(id)){
+                auto *errorContext = new ErrorContext<PascalSParser::FactorContext>;
+                errorContext->context = context;
+                errorContext->symbolTable = symbolTable.get();
+                errorContext->id = id;
+                errorContext->ss = &(output << getCurrentIndentation());
+                UndefinedFunctionStrategy(errorContext);
+            }
 
-        // 检查此ID是否为符号表中的函数
-        if (symbolTable->hasSymbol(id)) {
-            const SymbolEntry& entry = symbolTable->getSymbol(id);
+            // 检查此ID是否为符号表中的函数
+            if (symbolTable->hasSymbol(id)) {
+                const SymbolEntry& entry = symbolTable->getSymbol(id);
 
-            // 如果它是一个函数且有作用域（意味着它是函数声明，而不是变量）
-            if (entry.symbolType == SymbolType::FUNCTION && symbolTable->hasScope(id)) {
-                const ScopeEntry& scope = symbolTable->getScope(id);
-                // 检查函数是否没有参数
-                if (!scope.getParameters().empty()) {
-                    auto *errorContext = new ErrorContext<PascalSParser::FactorContext>;
-                    errorContext->context = context;
-                    errorContext->id = id;
-                    errorContext->symbolTable = symbolTable.get();
-                    errorContext->ss = &(output << getCurrentIndentation());
-                    MissingArgumentsStrategy(errorContext);
+                // 如果它是一个函数且有作用域（意味着它是函数声明，而不是变量）
+                if ((entry.symbolType == SymbolType::FUNCTION || entry.symbolType == SymbolType::PROCEDURE) && symbolTable->hasScope(id)) {
+                    const ScopeEntry& scope = symbolTable->getScope(id);
+                    // 检查函数是否没有参数
+                    if (!scope.getParameters().empty()) {
+                        auto *errorContext = new ErrorContext<PascalSParser::FactorContext>;
+                        errorContext->context = context;
+                        errorContext->id = id;
+                        errorContext->symbolTable = symbolTable.get();
+                        errorContext->ss = &(output << getCurrentIndentation());
+                        MissingArgumentsStrategy(errorContext);
+                    }
+                    return id + "()";
+                } else if (entry.symbolType == SymbolType::PARAMETER) {
+                    if (entry.isReference && symbolTable->hasSymbolInCurrentScope(id)) {
+                        // 对于非数组引用参数，访问时需要解引用
+                        return "(*" + id + ")";
+                    }
                 }
-                return id + "()";
-            } else if (entry.symbolType == SymbolType::PARAMETER) {
-                if (entry.isReference && symbolTable->hasSymbolInCurrentScope(id)) {
-                    // 对于非数组引用参数，访问时需要解引用
-                    return "(*" + id + ")";
+
+                // 特殊情况：如果在函数中且引用了函数自身的名称
+                // 作为变量（Pascal中的递归函数常见做法）
+                if (id == symbolTable->getCurrentScope().getScopeName()) {
+                    // 这是访问自己函数的返回值
+                    return id + "tmp";
                 }
             }
 
-            // 特殊情况：如果在函数中且引用了函数自身的名称
-            // 作为变量（Pascal中的递归函数常见做法）
-            if (id == symbolTable->getCurrentScope().getScopeName()) {
-                // 这是访问自己函数的返回值
-                return id + "tmp";
-            }
+            // 如果未识别为无参数函数，则视为普通变量
+            return id;
         }
-
-        // 如果未识别为无参数函数，则视为普通变量
-        return id;
     }
     // 逻辑NOT操作
     else if (context->NOT()) {
