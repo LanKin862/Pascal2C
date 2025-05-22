@@ -965,7 +965,7 @@ antlrcpp::Any PascalToCTranslator::visitValueParameter(PascalSParser::ValueParam
         if (!idListStr.empty()) idListStr += ", ";
         idListStr += id;
     }
-    TranslatorUtils::logDebug("Value parameter identifiers: " + idListStr);
+    TranslatorUtils::logDebug("Value参数标识符: " + idListStr);
 
     // 获取类型信息
     auto typeResult = visit(context->type());
@@ -1003,7 +1003,7 @@ antlrcpp::Any PascalToCTranslator::visitValueParameter(PascalSParser::ValueParam
         }
 
         ss << typeStr << " " << ids[i];
-        TranslatorUtils::logDebug("  Adding parameter: " + typeStr + " " + ids[i] +
+        TranslatorUtils::logDebug("  添加参数: " + typeStr + " " + ids[i] +
                                  ", type: " + (pascalType == PascalType::ARRAY ? "ARRAY" :
                                              (pascalType == PascalType::INTEGER ? "INTEGER" :
                                              (pascalType == PascalType::REAL ? "REAL" :
@@ -1942,6 +1942,9 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
     // 函数调用
     else if (context->ID()) {
         std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
+        if(!symbolTable->hasScope(id))
+            // 如果未识别为无参数函数，则视为普通变量
+            return id;
         if(symbolTable->hasSymbol(id) && symbolTable->getSymbol(id).symbolType == SymbolType::PROCEDURE) {
             auto *errorContext = new ErrorContext<PascalSParser::FactorContext>;
             errorContext->context = context;
@@ -1995,9 +1998,6 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
                     return id + "tmp";
                 }
             }
-
-            // 如果未识别为无参数函数，则视为普通变量
-            return id;
         }
     }
     // 逻辑NOT操作
