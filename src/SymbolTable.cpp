@@ -10,6 +10,8 @@
  */
 ScopeEntry::ScopeEntry(const std::string& name) : scopeName(name) {}
 
+ScopeEntry::ScopeEntry(const std::string &name, ScopeEntry* parent) : scopeName(name), parentScope(parent) {}
+
 /**
  * 向当前作用域添加符号
  * @param symbol 要添加的符号条目
@@ -117,6 +119,22 @@ std::string ScopeEntry::getScopeName() const {
     return scopeName;
 }
 
+/**
+ * 设置当前作用域的父作用域
+ * @param parent 父作用域条目的引用
+ */
+void ScopeEntry::setParentScope(ScopeEntry* parent) {
+    parentScope = parent;
+}
+
+/**
+ * 获取当前作用域的父作用域
+ * @return 当前作用域的父作用域条目的引用
+ */
+ScopeEntry* ScopeEntry::getParentScope() {
+    return parentScope;
+}
+
 // SymbolTable 实现
 
 /**
@@ -134,7 +152,8 @@ SymbolTable::SymbolTable() : currentScopeIndex(-1) {
  * @param scopeName 新作用域的名称
  */
 void SymbolTable::enterScope(const std::string& scopeName) {
-    scopes.push_back(std::unique_ptr<ScopeEntry>(new ScopeEntry(scopeName)));
+    ScopeEntry* parentScope = currentScopeIndex >= 0? scopes[currentScopeIndex].get() : nullptr;
+    scopes.push_back(std::unique_ptr<ScopeEntry>(new ScopeEntry(scopeName, parentScope)));
     currentScopeIndex = scopes.size() - 1;
 }
 
@@ -147,7 +166,14 @@ void SymbolTable::exitScope() {
     if (currentScopeIndex <= 0) {
         throw TranslatorException("Cannot exit global scope");
     }
-    currentScopeIndex--;
+    ScopeEntry* parentScope = scopes[currentScopeIndex]->getParentScope();
+    //查找父作用域的索引
+    for (size_t i = 0; i < scopes.size(); i++) {
+        if (scopes[i].get() == parentScope) {
+            currentScopeIndex = i;
+            return;
+        }
+    }
 }
 
 /**
@@ -172,6 +198,22 @@ ScopeEntry& SymbolTable::getCurrentScope() {
  */
 const ScopeEntry& SymbolTable::getCurrentScope() const {
     return *scopes[currentScopeIndex];
+}
+
+/**
+ * 设置当前作用域的父作用域
+ * @param parent 父作用域条目的引用
+ */
+void SymbolTable::setCurrentScopeParent(ScopeEntry* parent) {
+    scopes[currentScopeIndex]->setParentScope(parent);
+}
+
+/**
+ * 获取当前作用域的父作用域
+ * @return 当前作用域的父作用域条目的引用
+ */
+ScopeEntry& SymbolTable::getParentScope() {
+    return *scopes[currentScopeIndex]->getParentScope();
 }
 
 /**

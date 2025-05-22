@@ -25,7 +25,7 @@ enum class PascalType {
 };
 
 namespace std {
-    template <>
+    template<>
     struct hash<PascalType> {
         size_t operator()(PascalType pt) const noexcept {
             return static_cast<size_t>(pt);
@@ -52,50 +52,85 @@ struct SymbolEntry {
 
 // 符号表的作用域条目
 class ScopeEntry {
-  private:
+private:
     std::map<std::string, SymbolEntry> symbols;
     std::string scopeName;
     std::vector<SymbolEntry> parameters;  // 按声明顺序存储参数
+    ScopeEntry *parentScope;
 
-  public:
-    ScopeEntry(const std::string& name);
-    bool addSymbol(const SymbolEntry& symbol);
-    bool hasSymbol(const std::string& name) const;
-    SymbolEntry& getSymbol(const std::string& name);
-    const SymbolEntry& getSymbol(const std::string& name) const;
-    std::map<std::string, SymbolEntry>& getSymbols();
-    const std::map<std::string, SymbolEntry>& getSymbols() const;
+public:
+    ScopeEntry(const std::string &name);
+
+    ScopeEntry(const std::string &name, ScopeEntry *parent);
+
+    bool addSymbol(const SymbolEntry &symbol);
+
+    bool hasSymbol(const std::string &name) const;
+
+    SymbolEntry &getSymbol(const std::string &name);
+
+    const SymbolEntry &getSymbol(const std::string &name) const;
+
+    std::map<std::string, SymbolEntry> &getSymbols();
+
+    const std::map<std::string, SymbolEntry> &getSymbols() const;
+
     std::string getScopeName() const;
+
     // 将参数添加到有序列表（用于过程和函数）
-    void addParameter(const SymbolEntry& param);
+    void addParameter(const SymbolEntry &param);
+
     // 按顺序获取参数
-    const std::vector<SymbolEntry>& getParameters() const;
+    const std::vector<SymbolEntry> &getParameters() const;
+
     // 获取参数向量的可变引用以进行修改
-    std::vector<SymbolEntry>& getParameters();
+    std::vector<SymbolEntry> &getParameters();
+
+    //设置父作用域
+    void setParentScope(ScopeEntry *parent);
+
+    // 获取父作用域
+    ScopeEntry *getParentScope();
 };
 
 // 符号表类，用于管理符号和作用域
 class SymbolTable {
-  private:
+private:
     std::vector<std::unique_ptr<ScopeEntry>> scopes;
     int currentScopeIndex;
 
-  public:
+public:
     SymbolTable();
 
     // 作用域管理
-    void enterScope(const std::string& scopeName);
+    void enterScope(const std::string &scopeName);
+
     void exitScope();
+
     bool isInGlobalScope() const;
-    ScopeEntry& getCurrentScope();
-    const ScopeEntry& getCurrentScope() const;
-    bool hasScope(const std::string& scopeName) const;
-    const ScopeEntry& getScope(const std::string& scopeName) const;
+
+    ScopeEntry &getCurrentScope();
+
+    const ScopeEntry &getCurrentScope() const;
+
+    bool hasScope(const std::string &scopeName) const;
+
+    const ScopeEntry &getScope(const std::string &scopeName) const;
 
     // 符号管理
-    bool addSymbol(const SymbolEntry& symbol);
-    bool hasSymbolInCurrentScope(const std::string& name) const;
-    bool hasSymbol(const std::string& name) const;
-    SymbolEntry& getSymbol(const std::string& name);
-    const SymbolEntry& getSymbol(const std::string& name) const;
+    bool addSymbol(const SymbolEntry &symbol);
+
+    bool hasSymbolInCurrentScope(const std::string &name) const;
+
+    bool hasSymbol(const std::string &name) const;
+
+    SymbolEntry &getSymbol(const std::string &name);
+
+    const SymbolEntry &getSymbol(const std::string &name) const;
+
+    //设置父作用域
+    void setCurrentScopeParent(ScopeEntry *parent);
+
+    // 获取父作用域
+    ScopeEntry &getParentScope();
 };

@@ -272,7 +272,7 @@ template<typename T>
 static void ArrayIndexOutOfBounds(ErrorContext<T> *errorContext) {
     if (errorContext == nullptr || errorContext->ss == nullptr) return;
 
-    std::cout << "-" << std::endl;
+    std::cout << "----------------------------------------------------------" << std::endl;
     std::cout << "警告：";
     std::cout << "数组索引使用不合法";
 
@@ -283,9 +283,7 @@ static void ArrayIndexOutOfBounds(ErrorContext<T> *errorContext) {
     if (errorContext->context != nullptr && errorContext->context->start != nullptr) {
         std::cout << " ，行：" << errorContext->context->start->getLine();
     }
-
-    std::cout << std::endl;
-    std::cout << "-" << std::endl;
+    std::cout << "----------------------------------------------------------" << std::endl;
     *(errorContext->ss) << "//[Warning] 数组索引使用不合法" << std::endl;
 
     deleteErrorContext(errorContext);

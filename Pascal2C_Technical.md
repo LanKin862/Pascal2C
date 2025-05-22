@@ -419,6 +419,7 @@ ScopeEntry{
     std::vector<SymbolEntry> parameters;  // 按声明顺序存储参数
   public:
     ScopeEntry(const std::string& name);
+    ScopeEntry(const std::string& name, ScopeEntry* parent);
     // 符号管理
     bool addSymbol(const SymbolEntry& symbol);
     bool hasSymbol(const std::string& name) const;
@@ -430,6 +431,10 @@ ScopeEntry{
     const std::vector<SymbolEntry>& getParameters() const;
     // 获取参数向量的可变引用以进行修改
     std::vector<SymbolEntry>& getParameters();
+    //设置父作用域
+    void setParentScope(ScopeEntry *parent);
+    // 获取父作用域
+    ScopeEntry *getParentScope();
 }
 // 符号表类，用于管理符号和作用域
 SymbolTable{
@@ -454,6 +459,10 @@ SymbolTable{
     bool hasSymbol(const std::string& name) const;
     SymbolEntry& getSymbol(const std::string& name);
     const SymbolEntry& getSymbol(const std::string& name) const;
+    //设置父作用域
+	void setCurrentScopeParent(ScopeEntry *parent);
+	// 获取父作用域
+	ScopeEntry &getParentScope();
 }
 ```
 
@@ -639,6 +648,7 @@ private:
     std::map<std::string, SymbolEntry> symbols;  // 符号表映射
     std::string scopeName;                       // 作用域名称
     std::vector<SymbolEntry> parameters;  		 // 判断是否为引用调用参数
+    ScopeEntry *parentScope;					 // 存储父作用域
 };
 ```
 
@@ -1118,7 +1128,7 @@ Pascal2C项目的语法分析采用自顶向下的方法，具体基于ANTLR4自
   + 赋值语句类型兼容性
   + 条件语句条件表达式须是布尔类型
 + 运算：
-  + 支持运算：$\div$ $mod$  $+$ $-$ $\times$ ~ $\&$ $|$   
+  + 支持运算：$\div$ $mod$  $+$ $-$ $\times$ ~ $|$ $\&$   
 
 >新增文法处理（相较于基础文法要求）：
 >
