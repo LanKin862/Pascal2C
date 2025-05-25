@@ -283,6 +283,7 @@ static void ArrayIndexOutOfBounds(ErrorContext<T> *errorContext) {
     if (errorContext->context != nullptr && errorContext->context->start != nullptr) {
         std::cout << " ，行：" << errorContext->context->start->getLine();
     }
+    std::cout << std::endl;
     std::cout << "----------------------------------------------------------" << std::endl;
     *(errorContext->ss) << "//[Warning] 数组索引使用不合法" << std::endl;
 

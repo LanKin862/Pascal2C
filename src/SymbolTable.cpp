@@ -22,16 +22,16 @@ bool ScopeEntry::addSymbol(const SymbolEntry& symbol) {
     if (hasSymbol(symbol.name)) {
         return false;
     }
-    
+
     // 将符号添加到映射中
     symbols[symbol.name] = symbol;
-    
+
     // 如果这是一个参数，则将其添加到有序参数列表中
     // 这对于函数调用将参数与形参匹配很重要
     if (symbol.symbolType == SymbolType::PARAMETER) {
         addParameter(symbol);
     }
-    
+
     return true;
 }
 

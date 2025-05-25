@@ -1942,9 +1942,17 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
     // 函数调用
     else if (context->ID()) {
         std::string id = TranslatorUtils::toCIdentifier(context->ID()->getText());
-        if(!symbolTable->hasScope(id))
+        if(!symbolTable->hasScope(id)){
+            const SymbolEntry& entry = symbolTable->getSymbol(id);
+            if (entry.symbolType == SymbolType::PARAMETER) {
+                if (entry.isReference && symbolTable->hasSymbolInCurrentScope(id)) {
+                    // 对于非数组引用参数，访问时需要解引用
+                    return "(*" + id + ")";
+                }
+            }
             // 如果未识别为无参数函数，则视为普通变量
             return id;
+        }
         if(symbolTable->hasSymbol(id) && symbolTable->getSymbol(id).symbolType == SymbolType::PROCEDURE) {
             auto *errorContext = new ErrorContext<PascalSParser::FactorContext>;
             errorContext->context = context;
@@ -1984,11 +1992,6 @@ antlrcpp::Any PascalToCTranslator::visitFactor(PascalSParser::FactorContext *con
                         MissingArguments(errorContext);
                     }
                     return id + "()";
-                } else if (entry.symbolType == SymbolType::PARAMETER) {
-                    if (entry.isReference && symbolTable->hasSymbolInCurrentScope(id)) {
-                        // 对于非数组引用参数，访问时需要解引用
-                        return "(*" + id + ")";
-                    }
                 }
 
                 // 特殊情况：如果在函数中且引用了函数自身的名称
@@ -2595,19 +2598,19 @@ bool PascalToCTranslator::areTypesForComparisonCompatible(PascalType leftType, P
     if (leftType == rightType) {
         return true;
     }
-    
+
     // 数值类型之间可以比较
     if ((leftType == PascalType::INTEGER || leftType == PascalType::REAL) &&
         (rightType == PascalType::INTEGER || rightType == PascalType::REAL)) {
         return true;
     }
-    
+
     // 字符串和字符可以比较
     if ((leftType == PascalType::STRING && rightType == PascalType::CHAR) ||
         (leftType == PascalType::CHAR && rightType == PascalType::STRING)) {
         return true;
     }
-    
+
     // 其他类型组合不能比较
     return false;
 }

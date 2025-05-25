@@ -13,6 +13,7 @@ Pascal2C/
 │   ├── SymbolTable.h          # 符号表相关定义
 │   ├── TypeConverter.h        # 类型转换工具
 │   └── TranslatorUtils.h      # 转换工具函数
+│	└── ErrorDealer.h		   # 错误处理功能函数
 ├── src/             # 源代码目录
 │   ├── main.cpp              # 程序入口
 │   ├── PascalToCTranslator.cpp # 转换器实现
@@ -44,11 +45,17 @@ Pascal2C/
 - 处理字符串操作和代码格式化
 - 提供辅助功能支持
 
+### 5. ErrorDealer
+
++ 提供错误收集器结构体
++ 提供对Pascal的语法错误在转换为C语言的错误处理
+
 ## 项目配置
 
 ### 构建要求
-- CMake 3.27或更高版本
-- C++17兼容的编译器
+
+- CMake 3.20或更高版本
+- C++11兼容的编译器
 - ANTLR4运行时库
 
 ### 依赖项
@@ -76,10 +83,10 @@ cmake --build .
 
 ## 使用方法
 
-1. 准备Pascal源代码文件（.pas扩展名）
+1. 准备Pascal源代码文件（.pascc扩展名）
 2. 运行转换器：
 ```bash
-./pascc input.pas -o output.c
+./pascc -i input.pascc
 ```
 
 ## 注意事项
@@ -91,6 +98,6 @@ cmake --build .
 ## 开发说明
 
 - 项目使用CMake作为构建系统
-- 代码遵循C++17标准
+- 代码遵循C++11标准
 - 使用ANTLR4进行语法解析
 - 支持基本的Pascal语言特性转换
